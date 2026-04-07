@@ -1,0 +1,1955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>PM Tracker</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<style>
+/* ── Reset & base ─────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;color:#1e293b;background:#f8fafc;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+input,textarea,select{font:inherit;color:inherit}
+input:focus,textarea:focus,select:focus{outline:none}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ── Layout ───────────────────────────────────── */
+#app-shell{display:flex;flex:1;overflow:hidden}
+#sidebar{width:208px;background:#0f172a;display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;height:100%}
+#main-wrapper{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:.75rem 1.25rem;display:flex;align-items:center;gap:.75rem;flex-shrink:0;min-height:54px}
+#tb-title{flex:1}
+#tb-actions{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+main#main{flex:1;overflow-y:auto}
+
+/* ── Sidebar internals ───────────────────────── */
+#sb-streak{margin:.75rem .75rem .25rem;padding:.625rem .75rem;border-radius:.75rem;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);flex-shrink:0}
+#proj-list{padding:0 .5rem .5rem;overflow-y:auto;flex:1}
+.snav{width:100%;text-align:left;padding:.45rem .75rem;border-radius:.5rem;font-size:.875rem;display:flex;align-items:center;gap:.625rem;transition:background .12s,color .12s;color:#94a3b8}
+.snav:hover{background:rgba(255,255,255,.06);color:#fff}
+.snav.active{background:rgba(255,255,255,.12);color:#fff}
+
+/* ── Cards ────────────────────────────────────── */
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:1rem;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card-lg{border-radius:1.25rem}
+
+/* ── Task rows ────────────────────────────────── */
+.task-row:hover{background:#f8fafc}
+
+/* ── Buttons ──────────────────────────────────── */
+.btn-primary{background:#4f46e5;color:#fff;padding:.5rem 1rem;border-radius:.75rem;font-size:.875rem;font-weight:600;transition:background .15s;display:inline-flex;align-items:center;gap:.375rem}
+.btn-primary:hover{background:#4338ca}
+.btn-secondary{border:1px solid #e2e8f0;color:#64748b;padding:.5rem 1rem;border-radius:.75rem;font-size:.875rem;transition:background .15s,border-color .15s}
+.btn-secondary:hover{background:#f8fafc;border-color:#cbd5e1}
+.btn-danger{border:1px solid #fecaca;color:#ef4444;padding:.5rem 1rem;border-radius:.75rem;font-size:.875rem;transition:background .15s}
+.btn-danger:hover{background:#fef2f2}
+
+/* ── Form inputs ─────────────────────────────── */
+.field{width:100%;border:1px solid #e2e8f0;border-radius:.75rem;padding:.625rem .75rem;font-size:.875rem;transition:border-color .15s,box-shadow .15s;background:#fff}
+.field:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+textarea.field{resize:none}
+select.field{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center;padding-right:2.25rem}
+
+/* ── Badges ──────────────────────────────────── */
+.badge{font-size:.7rem;padding:.2rem .55rem;border-radius:9999px;font-weight:600;display:inline-block}
+.badge-slate{background:#f1f5f9;color:#64748b}
+.badge-blue{background:#eff6ff;color:#2563eb}
+.badge-red{background:#fef2f2;color:#dc2626}
+.badge-green{background:#f0fdf4;color:#16a34a}
+
+/* ── Tags ────────────────────────────────────── */
+.tag{display:inline-block;padding:.15rem .5rem;background:#f5f3ff;color:#7c3aed;font-size:.7rem;border-radius:.375rem;font-weight:500}
+
+/* ── Status badge colors (Tailwind-compatible names) ── */
+.bg-slate-100.text-slate-500,.badge-slate{background:#f1f5f9;color:#64748b}
+
+/* ── Checkbox circles ────────────────────────── */
+.check-circle{width:1.1rem;height:1.1rem;border-radius:50%;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:border-color .15s,background .15s;cursor:pointer}
+.check-circle:hover{border-color:#22c55e}
+.check-circle.done{background:#22c55e;border-color:#22c55e}
+.check-circle-lg{width:1.25rem;height:1.25rem}
+
+/* ── Animations ─────────────────────────────── */
+.fade-in{animation:fadeIn .18s ease both}
+.slide-up{animation:slideUp .22s ease both}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.spin{display:inline-block;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Toast ──────────────────────────────────── */
+#toast{transition:opacity .25s,transform .25s}
+
+/* ── Summary prose ──────────────────────────── */
+.prose h2{font-size:.82rem;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:.06em;margin:1.2rem 0 .35rem}
+.prose h2:first-child{margin-top:0}
+.prose p{color:#475569;line-height:1.75;margin-bottom:.5rem}
+.prose ul{list-style:disc;padding-left:1.3rem;color:#475569;line-height:1.75}
+.prose li{margin-bottom:.2rem}
+
+/* ── Modals ─────────────────────────────────── */
+#qc-wrap,#mod-wrap,#ext-wrap{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center}
+#mod-wrap,#ext-wrap{align-items:center}
+#qc-inner,#mod-box,#ext-box{background:#fff;border-radius:1.25rem;box-shadow:0 25px 50px rgba(0,0,0,.25);width:100%;max-width:540px;overflow-y:auto}
+#qc-inner{max-width:580px;overflow:hidden}
+#mod-box,#ext-box{max-height:90vh}
+
+/* ── Misc utilities ─────────────────────────── */
+.truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hidden{display:none!important}
+.divider{border-top:1px solid rgba(255,255,255,.1);margin:.5rem 1rem}
+
+/* ── Mobile sidebar ─────────────────────────── */
+@media(max-width:767px){
+  #sidebar{position:fixed;left:-100%;top:0;bottom:0;z-index:40;transition:left .25s ease;width:220px}
+  #sidebar.open{left:0}
+  #mob-overlay{display:block!important}
+}
+#mob-overlay{display:none}
+
+/* ── Kanban board ────────────────────────────── */
+.kb-board{display:flex;gap:1rem;padding:1.25rem;overflow-x:auto;align-items:flex-start;min-height:calc(100vh - 120px)}
+.kb-col{flex:0 0 272px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:1rem;display:flex;flex-direction:column;max-height:calc(100vh - 140px)}
+.kb-col-hdr{display:flex;align-items:center;gap:.4rem;padding:.75rem 1rem .5rem;border-bottom:1px solid #e2e8f0;flex-shrink:0}
+.kb-dot{width:.55rem;height:.55rem;border-radius:50%;flex-shrink:0}
+.kb-badge{font-size:.68rem;font-weight:600;padding:.1rem .45rem;background:#e2e8f0;color:#475569;border-radius:9999px}
+.kb-cards{flex:1;overflow-y:auto;padding:.5rem;display:flex;flex-direction:column;gap:.5rem}
+.kb-card{background:#fff;border:1px solid #e2e8f0;border-radius:.75rem;padding:.75rem;cursor:grab;transition:box-shadow .15s,border-color .15s,opacity .15s,transform .15s}
+.kb-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.08);border-color:#c7d2fe}
+.kb-card:active{cursor:grabbing}
+.kb-dragging{opacity:.35!important;transform:scale(.97)!important;box-shadow:none!important}
+.kb-drop-above{border-top:2px solid #6366f1!important;border-radius:.75rem .75rem 0 0!important;margin-top:-1px}
+.kb-drop-below{border-bottom:2px solid #6366f1!important;border-radius:0 0 .75rem .75rem!important;margin-bottom:-1px}
+.kb-col-drop{border-color:#6366f1!important;background:#f5f3ff!important}
+.kb-add-btn{width:100%;text-align:left;padding:.6rem 1rem;font-size:.8rem;color:#94a3b8;background:none;border:none;cursor:pointer;transition:color .15s;border-top:1px solid #e2e8f0;flex-shrink:0}
+.kb-add-btn:hover{color:#6366f1}
+@media(max-width:767px){.kb-board{padding:.75rem}.kb-col{flex:0 0 240px}}
+
+/* ── Color dot helpers ─────────────────────── */
+.dot-slate{background:#94a3b8}
+.dot-blue{background:#3b82f6}
+.dot-red{background:#ef4444}
+.dot-green{background:#22c55e}
+.dot-indigo{background:#6366f1}
+
+/* ════════════════════════════════════════════════════════════
+   TAILWIND-COMPATIBLE UTILITY CLASSES (inline, fully offline)
+   Covers every utility class referenced in HTML + JS templates
+════════════════════════════════════════════════════════════ */
+
+/* Display */
+.flex{display:flex}.inline-flex{display:inline-flex}.grid{display:grid}
+.block{display:block}.inline-block{display:inline-block}
+
+/* Flex / Grid */
+.flex-col{flex-direction:column}.flex-wrap{flex-wrap:wrap}
+.flex-1{flex:1 1 0%}.flex-shrink-0{flex-shrink:0}
+.items-center{align-items:center}.items-start{align-items:flex-start}.items-end{align-items:flex-end}
+.justify-center{justify-content:center}.justify-between{justify-content:space-between}.justify-end{justify-content:flex-end}
+.gap-0\.5{gap:.125rem}.gap-1{gap:.25rem}.gap-1\.5{gap:.375rem}.gap-2{gap:.5rem}.gap-2\.5{gap:.625rem}.gap-3{gap:.75rem}.gap-4{gap:1rem}
+.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.space-y-0\.5>*+*{margin-top:.125rem}.space-y-1>*+*{margin-top:.25rem}
+.space-y-4>*+*{margin-top:1rem}.space-y-8>*+*{margin-top:2rem}
+
+/* Position */
+.fixed{position:fixed}.absolute{position:absolute}.relative{position:relative}
+.inset-0{top:0;right:0;bottom:0;left:0}
+.z-30{z-index:30}.z-40{z-index:40}.z-50{z-index:50}
+.bottom-6{bottom:1.5rem}.left-1\/2{left:50%}
+.-translate-x-1\/2{transform:translateX(-50%)}
+.translate-y-2{transform:translateY(.5rem)}
+.pointer-events-none{pointer-events:none}
+
+/* Width */
+.w-2{width:.5rem}.w-2\.5{width:.625rem}.w-3{width:.75rem}.w-3\.5{width:.875rem}
+.w-4{width:1rem}.w-5{width:1.25rem}.w-8{width:2rem}.w-52{width:13rem}.w-full{width:100%}
+.min-w-0{min-width:0}.min-w-\[200px\]{min-width:200px}
+.max-w-lg{max-width:32rem}.max-w-xl{max-width:36rem}.max-w-2xl{max-width:42rem}
+.max-w-3xl{max-width:48rem}.max-w-4xl{max-width:56rem}
+
+/* Height */
+.h-2{height:.5rem}.h-2\.5{height:.625rem}.h-3{height:.75rem}.h-3\.5{height:.875rem}
+.h-4{height:1rem}.h-5{height:1.25rem}.h-8{height:2rem}.h-screen{height:100vh}.h-full{height:100%}
+.max-h-\[88vh\]{max-height:88vh}.max-h-\[92vh\]{max-height:92vh}
+.min-h-\[54px\]{min-height:54px}
+.overflow-hidden{overflow:hidden}.overflow-y-auto{overflow-y:auto}
+
+/* Padding */
+.p-1{padding:.25rem}.p-1\.5{padding:.375rem}.p-4{padding:1rem}.p-5{padding:1.25rem}
+.px-1{padding-left:.25rem;padding-right:.25rem}
+.px-1\.5{padding-left:.375rem;padding-right:.375rem}
+.px-2{padding-left:.5rem;padding-right:.5rem}
+.px-2\.5{padding-left:.625rem;padding-right:.625rem}
+.px-3{padding-left:.75rem;padding-right:.75rem}
+.px-3\.5{padding-left:.875rem;padding-right:.875rem}
+.px-4{padding-left:1rem;padding-right:1rem}
+.px-5{padding-left:1.25rem;padding-right:1.25rem}
+.py-0\.5{padding-top:.125rem;padding-bottom:.125rem}
+.py-1{padding-top:.25rem;padding-bottom:.25rem}
+.py-1\.5{padding-top:.375rem;padding-bottom:.375rem}
+.py-2{padding-top:.5rem;padding-bottom:.5rem}
+.py-2\.5{padding-top:.625rem;padding-bottom:.625rem}
+.py-3{padding-top:.75rem;padding-bottom:.75rem}
+.py-3\.5{padding-top:.875rem;padding-bottom:.875rem}
+.py-4{padding-top:1rem;padding-bottom:1rem}
+.py-14{padding-top:3.5rem;padding-bottom:3.5rem}
+.py-16{padding-top:4rem;padding-bottom:4rem}
+.pt-2{padding-top:.5rem}.pt-4{padding-top:1rem}.pt-5{padding-top:1.25rem}.pt-24{padding-top:6rem}
+.pb-1{padding-bottom:.25rem}.pb-2\.5{padding-bottom:.625rem}.pb-3{padding-bottom:.75rem}
+.pb-4{padding-bottom:1rem}.pb-5{padding-bottom:1.25rem}
+
+/* Margin */
+.mx-auto{margin-left:auto;margin-right:auto}
+.mx-3{margin-left:.75rem;margin-right:.75rem}.mx-4{margin-left:1rem;margin-right:1rem}
+.mt-0\.5{margin-top:.125rem}.mt-1{margin-top:.25rem}.mt-1\.5{margin-top:.375rem}
+.mt-3{margin-top:.75rem}.mt-6{margin-top:1.5rem}
+.mb-1{margin-bottom:.25rem}.mb-1\.5{margin-bottom:.375rem}.mb-2{margin-bottom:.5rem}
+.mb-2\.5{margin-bottom:.625rem}.mb-3{margin-bottom:.75rem}.mb-4{margin-bottom:1rem}
+.mb-5{margin-bottom:1.25rem}.mb-6{margin-bottom:1.5rem}
+.ml-1{margin-left:.25rem}.ml-auto{margin-left:auto}.-ml-1{margin-left:-.25rem}
+.my-2{margin-top:.5rem;margin-bottom:.5rem}
+
+/* Placeholder color */
+.placeholder-slate-400::placeholder{color:#94a3b8}
+
+/* Background */
+.bg-white{background:#fff}.bg-transparent{background:transparent}
+.bg-slate-50{background:#f8fafc}.bg-slate-100{background:#f1f5f9}
+.bg-slate-400{background:#94a3b8}.bg-slate-800{background:#1e293b}.bg-slate-900{background:#0f172a}
+.bg-indigo-500{background:#6366f1}.bg-indigo-600{background:#4f46e5}.bg-indigo-700{background:#4338ca}
+.bg-green-50{background:#f0fdf4}.bg-green-500{background:#22c55e}
+.bg-red-50{background:#fef2f2}.bg-red-500{background:#ef4444}
+.bg-blue-50{background:#eff6ff}.bg-blue-500{background:#3b82f6}
+.bg-violet-50{background:#f5f3ff}
+.bg-black\/40{background:rgba(0,0,0,.4)}
+.bg-white\/5{background:rgba(255,255,255,.05)}.bg-white\/10{background:rgba(255,255,255,.1)}
+.bg-white\/25{background:rgba(255,255,255,.25)}
+
+/* Text color */
+.text-white{color:#fff}
+.text-slate-300{color:#cbd5e1}.text-slate-400{color:#94a3b8}.text-slate-500{color:#64748b}
+.text-slate-600{color:#475569}.text-slate-700{color:#334155}.text-slate-800{color:#1e293b}
+.text-indigo-400{color:#818cf8}.text-indigo-500{color:#6366f1}.text-indigo-600{color:#4f46e5}
+.text-green-600{color:#16a34a}.text-green-700{color:#15803d}
+.text-red-400{color:#f87171}.text-red-500{color:#ef4444}.text-red-600{color:#dc2626}.text-red-700{color:#b91c1c}
+.text-blue-500{color:#3b82f6}.text-blue-600{color:#2563eb}
+.text-violet-600{color:#7c3aed}
+
+/* Font size */
+.text-xs{font-size:.75rem;line-height:1rem}
+.text-sm{font-size:.875rem;line-height:1.25rem}
+.text-base{font-size:1rem;line-height:1.5rem}
+.text-lg{font-size:1.125rem;line-height:1.75rem}
+.text-xl{font-size:1.25rem;line-height:1.75rem}
+.text-2xl{font-size:1.5rem;line-height:2rem}
+.text-4xl{font-size:2.25rem;line-height:2.5rem}
+
+/* Font weight / style / family */
+.font-normal{font-weight:400}.font-medium{font-weight:500}.font-semibold{font-weight:600}.font-bold{font-weight:700}
+.font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+.italic{font-style:italic}
+
+/* Text transform / decoration / spacing */
+.uppercase{text-transform:uppercase}
+.tracking-wide{letter-spacing:.025em}.tracking-wider{letter-spacing:.05em}
+.leading-none{line-height:1}
+.text-center{text-align:center}.text-right{text-align:right}
+.line-through{text-decoration:line-through}
+.underline{text-decoration:underline}
+.whitespace-nowrap{white-space:nowrap}
+
+/* Border */
+.border{border-width:1px;border-style:solid}.border-2{border-width:2px;border-style:solid}
+.border-b{border-bottom-width:1px;border-bottom-style:solid}
+.border-t{border-top-width:1px;border-top-style:solid}
+.border-slate-50{border-color:#f8fafc}.border-slate-100{border-color:#f1f5f9}
+.border-slate-200{border-color:#e2e8f0}.border-slate-300{border-color:#cbd5e1}
+.border-white\/10{border-color:rgba(255,255,255,.1)}
+.border-indigo-300{border-color:#a5b4fc}.border-indigo-400{border-color:#818cf8}
+.border-green-100{border-color:#dcfce7}.border-green-300{border-color:#86efac}
+.border-red-200{border-color:#fecaca}
+
+/* Border radius */
+.rounded{border-radius:.25rem}.rounded-md{border-radius:.375rem}.rounded-lg{border-radius:.5rem}
+.rounded-xl{border-radius:.75rem}.rounded-2xl{border-radius:1rem}.rounded-full{border-radius:9999px}
+.rounded-t-md{border-radius:.375rem .375rem 0 0}
+
+/* Shadow */
+.shadow-sm{box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.shadow-md{box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1)}
+.shadow-xl{box-shadow:0 20px 25px -5px rgba(0,0,0,.1),0 8px 10px -6px rgba(0,0,0,.1)}
+.shadow-2xl{box-shadow:0 25px 50px -12px rgba(0,0,0,.25)}
+
+/* Ring */
+.ring-2{box-shadow:0 0 0 2px #475569}
+.ring-1{box-shadow:0 0 0 1px rgba(130,138,251,.5)}
+.ring-offset-2{padding:2px}
+
+/* Opacity */
+.opacity-0{opacity:0}.opacity-50{opacity:.5}
+
+/* Transitions */
+.transition-all{transition:all .15s ease}
+.transition-colors{transition:color .15s ease,background-color .15s ease,border-color .15s ease}
+.transition-opacity{transition:opacity .15s ease}
+
+/* Scale / transform */
+.scale-105{transform:scale(1.05)}.scale-110{transform:scale(1.1)}
+
+/* Cursor */
+.cursor-pointer{cursor:pointer}.cursor-not-allowed{cursor:not-allowed}
+
+/* Misc */
+.resize-none{resize:none}
+.appearance-none{-webkit-appearance:none;appearance:none}
+.accent-indigo-600{accent-color:#4f46e5}
+.select-none{user-select:none}
+
+/* Group hover */
+.group:hover .group-hover\:opacity-100{opacity:1}
+
+/* Hover states */
+.hover\:bg-slate-50:hover{background:#f8fafc}
+.hover\:bg-slate-100:hover{background:#f1f5f9}
+.hover\:bg-red-50:hover{background:#fef2f2}
+.hover\:bg-indigo-700:hover{background:#4338ca}
+.hover\:bg-white\/6:hover{background:rgba(255,255,255,.06)}
+.hover\:bg-white\/10:hover{background:rgba(255,255,255,.1)}
+.hover\:border-slate-300:hover{border-color:#cbd5e1}
+.hover\:border-indigo-300:hover{border-color:#a5b4fc}
+.hover\:border-green-400:hover{border-color:#4ade80}
+.hover\:text-white:hover{color:#fff}
+.hover\:text-slate-600:hover{color:#475569}
+.hover\:text-indigo-600:hover{color:#4f46e5}
+.hover\:text-red-400:hover{color:#f87171}
+.hover\:opacity-80:hover{opacity:.8}
+.hover\:opacity-75:hover{opacity:.75}
+.hover\:scale-105:hover{transform:scale(1.05)}
+.hover\:underline:hover{text-decoration:underline}
+
+/* Focus states */
+.focus\:border-indigo-400:focus{border-color:#818cf8}
+.focus\:ring-2:focus{box-shadow:0 0 0 3px rgba(99,102,241,.12)}
+.focus\:ring-indigo-100:focus{box-shadow:0 0 0 3px rgba(224,231,255,.8)}
+
+/* Responsive sm: ≥640px */
+@media(min-width:640px){
+  .sm\:block{display:block}
+}
+/* Responsive md: ≥768px */
+@media(min-width:768px){
+  .md\:hidden{display:none}
+}
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen overflow-hidden flex flex-col">
+
+<!-- ═══════════════════════════════════════════════
+     LOGIN SCREEN
+═══════════════════════════════════════════════ -->
+<div id="login-screen" style="position:fixed;inset:0;z-index:999;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);display:flex;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#fff;border-radius:1.5rem;padding:2.5rem 2rem;max-width:380px;width:100%;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,.4)">
+    <div style="width:3.5rem;height:3.5rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:1.1rem;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:1.1rem;margin:0 auto 1.25rem;box-shadow:0 8px 20px rgba(99,102,241,.4)">PM</div>
+    <h1 style="font-size:1.35rem;font-weight:700;color:#1e293b;margin-bottom:.35rem;letter-spacing:-.02em">PM Tracker</h1>
+    <p style="font-size:.875rem;color:#94a3b8;margin-bottom:2rem;line-height:1.5">Your private workspace.<br>Sign in with Google to continue.</p>
+    <div id="g-signin-btn" style="display:flex;justify-content:center;min-height:44px;margin-bottom:.75rem"></div>
+    <p id="login-msg" style="font-size:.75rem;color:#94a3b8;margin-top:.5rem;line-height:1.6;min-height:1.2rem"></p>
+    <div id="login-setup" class="hidden" style="margin-top:1.25rem;text-align:left;background:#fefce8;border:1px solid #fde68a;border-radius:.875rem;padding:1rem;font-size:.75rem;color:#92400e;line-height:1.6">
+      <p style="font-weight:700;margin-bottom:.35rem">⚙️ One-time setup needed:</p>
+      <ol style="padding-left:1.1rem;margin:0">
+        <li>Go to <strong>console.firebase.google.com</strong></li>
+        <li>Create a project → Enable <strong>Authentication → Google</strong></li>
+        <li>Enable <strong>Firestore Database</strong> (start in production mode)</li>
+        <li>Go to Project Settings → copy the <strong>firebaseConfig</strong></li>
+        <li>Paste it into the <code style="background:#fde68a;padding:.1rem .3rem;border-radius:.25rem">FIREBASE_CONFIG</code> object at the top of the &lt;script&gt;</li>
+        <li>Add your hosting domain to <strong>Authentication → Authorized domains</strong></li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile overlay -->
+<div id="mob-overlay" class="hidden fixed inset-0 bg-black/40 z-30" onclick="closeSidebar()"></div>
+
+<div class="flex flex-1 overflow-hidden">
+
+<!-- ═══════════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════════ -->
+<aside id="sidebar" class="w-52 bg-slate-900 flex flex-col flex-shrink-0 overflow-hidden h-full">
+
+  <!-- Logo -->
+  <div class="px-4 py-4 border-b border-white/10 flex-shrink-0">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 bg-indigo-500 rounded-xl flex items-center justify-center font-bold text-white text-sm shadow-md">PM</div>
+      <div><div class="text-white text-sm font-semibold">PM Tracker</div><div class="text-slate-500 text-xs">for Doug</div></div>
+    </div>
+  </div>
+
+  <!-- Streak -->
+  <div id="sb-streak" class="mx-3 mt-3 mb-1 px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 flex-shrink-0"></div>
+
+  <!-- Nav -->
+  <nav class="px-2 pt-2 pb-1 space-y-0.5 flex-shrink-0">
+    <button onclick="sv('home')"    id="n-home"    class="snav"><span>🏠</span><span>Home</span></button>
+    <button onclick="sv('inbox')"   id="n-inbox"   class="snav"><span>📥</span><span>Inbox</span>
+      <span id="inbox-badge" class="ml-auto text-xs bg-white/10 text-slate-400 rounded-full px-1.5 hidden"></span></button>
+    <button onclick="sv('all')"     id="n-all"     class="snav"><span>📋</span><span>All Tasks</span></button>
+    <button onclick="sv('notes')"   id="n-notes"   class="snav"><span>📝</span><span>Notes → Tasks</span></button>
+    <button onclick="sv('summary')" id="n-summary" class="snav"><span>✨</span><span>Summary</span></button>
+  </nav>
+
+  <!-- Divider -->
+  <div class="mx-4 my-2 border-t border-white/10 flex-shrink-0"></div>
+
+  <!-- Projects -->
+  <div class="px-2 flex-1 overflow-y-auto pb-4">
+    <div class="flex items-center justify-between px-3 mb-1.5">
+      <span class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Projects</span>
+      <button onclick="openProjModal()" class="w-5 h-5 flex items-center justify-center text-slate-600 hover:text-white hover:bg-white/10 rounded text-lg leading-none transition-colors" title="New project">+</button>
+    </div>
+    <div id="proj-list" class="space-y-0.5"></div>
+  </div>
+
+  <!-- User + sync status -->
+  <div style="border-top:1px solid rgba(255,255,255,.08);padding:.5rem;flex-shrink:0">
+    <div id="sb-user"></div>
+    <div id="sync-status" style="text-align:center;font-size:.65rem;color:#334155;padding:.15rem 0;transition:opacity .3s;opacity:0"></div>
+  </div>
+
+</aside>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════════ -->
+<div class="flex-1 flex flex-col overflow-hidden">
+
+  <!-- Topbar -->
+  <header id="topbar" class="bg-white border-b border-slate-200 px-5 py-3 flex items-center gap-3 flex-shrink-0 min-h-[54px]">
+    <button onclick="openSidebar()" class="md:hidden p-1.5 hover:bg-slate-100 rounded-lg -ml-1">
+      <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div id="tb-title" class="flex-1"></div>
+    <div id="tb-actions" class="flex items-center gap-2 flex-shrink-0"></div>
+  </header>
+
+  <!-- Content -->
+  <main id="main" class="flex-1 overflow-y-auto"></main>
+</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     QUICK CAPTURE MODAL  (⌘K)
+═══════════════════════════════════════════════ -->
+<div id="qc-wrap" class="hidden fixed inset-0 z-50 flex items-start justify-center pt-24 px-4" style="background:rgba(15,23,42,.55);backdrop-filter:blur(4px)" onclick="if(event.target===this)closeQC()">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl slide-up overflow-hidden">
+    <div class="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100">
+      <span class="text-xl flex-shrink-0">⚡</span>
+      <input id="qc-in" type="text" placeholder="Type a task and press Enter…"
+        class="flex-1 text-base text-slate-800 bg-transparent placeholder-slate-400"
+        onkeydown="qcKey(event)" oninput="qcHint(this.value)">
+      <kbd class="text-xs bg-slate-100 text-slate-400 px-2 py-1 rounded">ESC</kbd>
+    </div>
+    <div id="qc-chips" class="hidden px-4 py-2 flex gap-2 flex-wrap border-b border-slate-100"></div>
+    <div class="px-4 py-2.5 flex items-center justify-between gap-4">
+      <p class="text-xs text-slate-400"><span class="text-slate-500 font-medium">#project</span> to assign · <span class="text-slate-500 font-medium">due friday</span> / <span class="text-slate-500 font-medium">tomorrow</span> · <span class="text-slate-500 font-medium">Shift+Enter</span> to add another</p>
+      <div id="qc-prev" class="text-xs text-indigo-500 font-medium text-right flex-shrink-0"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     TASK / PROJECT MODAL
+═══════════════════════════════════════════════ -->
+<div id="mod-wrap" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,23,42,.45);backdrop-filter:blur(3px)" onclick="if(event.target===this)closeMod()">
+  <div id="mod-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg fade-in max-h-[92vh] overflow-y-auto"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     NOTES EXTRACT MODAL
+═══════════════════════════════════════════════ -->
+<div id="ext-wrap" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(15,23,42,.45);backdrop-filter:blur(3px)" onclick="if(event.target===this)closeExt()">
+  <div id="ext-box" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg fade-in max-h-[88vh] overflow-y-auto"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 opacity-0 translate-y-2 pointer-events-none z-50 bg-slate-800 text-white text-sm px-4 py-2.5 rounded-full shadow-xl"></div>
+
+<!-- ═══════════════════════════════════════════════
+     SCRIPT
+═══════════════════════════════════════════════ -->
+<script>
+// ──────────────────────────────────────────────
+// TAILWIND COMPONENT CLASSES (injected at runtime)
+// ──────────────────────────────────────────────
+(function injectStyles(){
+  const s=document.createElement('style');
+  s.textContent=`.snav{width:100%;text-align:left;padding:.45rem .75rem;border-radius:.5rem;font-size:.875rem;display:flex;align-items:center;gap:.625rem;transition:background .12s,color .12s;color:#94a3b8}.snav:hover{background:rgba(255,255,255,.06);color:#fff}.snav.active{background:rgba(255,255,255,.12);color:#fff}`;
+  document.head.appendChild(s);
+})();
+
+// ══════════════════════════════════════════════════
+// FIREBASE CONFIG  ← paste your config values here
+// ══════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:            'YOUR_API_KEY',
+  authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
+  projectId:         'YOUR_PROJECT_ID',
+  storageBucket:     'YOUR_PROJECT_ID.appspot.com',
+  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+  appId:             'YOUR_APP_ID',
+};
+// Only this Google account is allowed in
+const ALLOWED_EMAIL = 'douglas.pickard@disney.com';
+
+// ──────────────────────────────────────────────
+// CONSTANTS
+// ──────────────────────────────────────────────
+const STORE   = 'pmtracker_v4';
+const KEY_API = 'pmtracker_api';
+
+const STATUS = {
+  'not-started':{ label:'Not Started', badge:'bg-slate-100 text-slate-500', dot:'#94a3b8' },
+  'in-progress':{ label:'In Progress', badge:'bg-blue-50 text-blue-600',   dot:'#3b82f6' },
+  'blocked'    :{ label:'Blocked',     badge:'bg-red-50 text-red-600',     dot:'#ef4444' },
+  'done'       :{ label:'Done',        badge:'bg-green-50 text-green-600', dot:'#22c55e' },
+};
+const ST_ORDER = ['not-started','in-progress','blocked','done'];
+const COLORS   = ['#6366f1','#8b5cf6','#ec4899','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6'];
+const WDAYS    = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+// ──────────────────────────────────────────────
+// STATE
+// ──────────────────────────────────────────────
+let S = {
+  view:'home', projId:null,
+  projects:[], tasks:[],
+  expanded:new Set(),
+  activity:[],   // YYYY-MM-DD strings → streak
+  notepad:'',    // persisted paste pad
+  boardView:false, // kanban vs list toggle
+};
+
+// ──────────────────────────────────────────────
+// PERSISTENCE
+// ──────────────────────────────────────────────
+function save(){
+  localStorage.setItem(STORE, JSON.stringify({
+    projects:S.projects, tasks:S.tasks,
+    activity:S.activity, notepad:S.notepad, boardView:S.boardView,
+  }));
+  scheduleCloudSync();
+}
+
+// ──────────────────────────────────────────────
+// FIREBASE AUTH + CLOUD SYNC
+// ──────────────────────────────────────────────
+let _db=null, _syncTimer=null;
+
+function isConfigured(){
+  return FIREBASE_CONFIG.apiKey!=='YOUR_API_KEY';
+}
+
+function initFirebase(){
+  if(!isConfigured()){
+    document.getElementById('login-msg').textContent='';
+    document.getElementById('login-setup').classList.remove('hidden');
+    return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  _db=firebase.firestore();
+  // Enable offline persistence
+  _db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+
+  firebase.auth().onAuthStateChanged(user=>{
+    if(user){
+      if(user.email!==ALLOWED_EMAIL){
+        document.getElementById('login-msg').textContent=`Access denied for ${user.email}. This tracker is private.`;
+        firebase.auth().signOut();
+        return;
+      }
+      loadFromCloud(user).then(()=>{
+        document.getElementById('login-screen').style.display='none';
+        logDay(); render();
+        renderUserBadge(user);
+      });
+    }
+    // Not signed in → login screen already visible, render Google button
+  });
+
+  // Render Google Sign-In button
+  const provider=new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({prompt:'select_account'});
+  const btn=document.getElementById('g-signin-btn');
+  btn.innerHTML=`<button onclick="googleSignIn()"
+    style="display:flex;align-items:center;gap:.75rem;padding:.625rem 1.25rem;border:1px solid #e2e8f0;border-radius:.75rem;background:#fff;font-size:.875rem;font-weight:500;color:#1e293b;cursor:pointer;transition:box-shadow .15s;box-shadow:0 1px 3px rgba(0,0,0,.08)"
+    onmouseover="this.style.boxShadow='0 3px 12px rgba(0,0,0,.12)'"
+    onmouseout="this.style.boxShadow='0 1px 3px rgba(0,0,0,.08)'">
+    <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Sign in with Google
+  </button>`;
+}
+
+async function googleSignIn(){
+  const provider=new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({prompt:'select_account'});
+  try{
+    document.getElementById('login-msg').textContent='Signing in…';
+    await firebase.auth().signInWithPopup(provider);
+    // onAuthStateChanged handles the rest
+  }catch(e){
+    document.getElementById('login-msg').textContent='Sign-in failed. Please try again.';
+  }
+}
+
+async function loadFromCloud(user){
+  try{
+    const doc=await _db.collection('users').doc(user.uid).get();
+    if(doc.exists){
+      const d=doc.data();
+      S.projects = d.projects||[];
+      S.tasks    = d.tasks||[];
+      S.activity = d.activity||[];
+      S.notepad  = d.notepad||'';
+      S.boardView= d.boardView||false;
+      // Keep local cache in sync
+      localStorage.setItem(STORE,JSON.stringify(d));
+    } else {
+      // First sign-in on this account — migrate any local data
+      load();
+      if(S.tasks.length||S.projects.length) doCloudSync();
+    }
+  }catch(e){
+    console.warn('Cloud load failed, using local cache',e);
+    load();
+  }
+}
+
+function scheduleCloudSync(){
+  if(!_db) return;
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(doCloudSync,1500);
+}
+
+async function doCloudSync(){
+  const user=firebase.auth()?.currentUser;
+  if(!user||!_db) return;
+  setSyncStatus('syncing');
+  try{
+    await _db.collection('users').doc(user.uid).set({
+      projects:S.projects, tasks:S.tasks,
+      activity:S.activity, notepad:S.notepad, boardView:S.boardView,
+      _ts:Date.now(),
+    });
+    setSyncStatus('synced');
+  }catch(e){
+    setSyncStatus('error');
+    console.warn('Cloud sync failed:',e);
+  }
+}
+
+function setSyncStatus(state){
+  const el=document.getElementById('sync-status');
+  if(!el) return;
+  const labels={syncing:'↑ Syncing…',synced:'✓ Synced',error:'⚠ Sync error'};
+  const colors={syncing:'#818cf8',synced:'#22c55e',error:'#f87171'};
+  el.textContent=labels[state]||'';
+  el.style.color=colors[state]||'#94a3b8';
+  el.style.opacity='1';
+  if(state==='synced') setTimeout(()=>{el.style.opacity='0';},2500);
+}
+
+function renderUserBadge(user){
+  const el=document.getElementById('sb-user');
+  if(!el) return;
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .5rem;border-radius:.5rem">
+    ${user.photoURL
+      ?`<img src="${user.photoURL}" style="width:1.6rem;height:1.6rem;border-radius:50%;flex-shrink:0;border:1px solid rgba(255,255,255,.15)">`
+      :`<span style="width:1.6rem;height:1.6rem;border-radius:50%;background:#4f46e5;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;flex-shrink:0">${(user.displayName||user.email||'?')[0].toUpperCase()}</span>`}
+    <span style="flex:1;font-size:.7rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${user.displayName||user.email}</span>
+    <button onclick="signOut()" title="Sign out"
+      style="background:none;border:none;cursor:pointer;color:#334155;font-size:.75rem;padding:.2rem .3rem;border-radius:.25rem;flex-shrink:0;line-height:1"
+      onmouseover="this.style.color='#ef4444';this.style.background='rgba(239,68,68,.1)'"
+      onmouseout="this.style.color='#334155';this.style.background='none'">⏻</button>
+  </div>`;
+}
+
+async function signOut(){
+  if(!confirm('Sign out of PM Tracker?')) return;
+  await firebase.auth().signOut();
+  location.reload();
+}
+function load(){
+  try{
+    const d=JSON.parse(localStorage.getItem(STORE)||'{}');
+    S.projects = d.projects||[];
+    S.tasks    = d.tasks||[];
+    S.activity   = d.activity||[];
+    S.notepad    = d.notepad||'';
+    S.boardView  = d.boardView||false;
+  }catch(e){console.error(e);}
+}
+
+// ──────────────────────────────────────────────
+// UTILS
+// ──────────────────────────────────────────────
+const uid  = ()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+// Use local date (not UTC) so timezone doesn't cause off-by-one-day bugs
+function day0(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function esc(s){ return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtD(d){
+  if(!d) return '';
+  const dt=new Date(d+'T12:00:00');
+  const now=new Date(); now.setHours(0,0,0,0);
+  const tom=new Date(now); tom.setDate(now.getDate()+1);
+  const dt2=new Date(dt); dt2.setHours(0,0,0,0);
+  if(dt2.getTime()===now.getTime()) return 'Today';
+  if(dt2.getTime()===tom.getTime()) return 'Tomorrow';
+  const diff=Math.round((dt2-now)/864e5);
+  if(diff>0&&diff<7) return dt.toLocaleDateString('en-US',{weekday:'short'});
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function fmtDLong(d){ return d?new Date(d+'T12:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):''; }
+const isOver   = (d,s)=>d&&s!=='done'&&d<day0();
+const isToday  = (d,s)=>d&&s!=='done'&&d===day0();
+const parseTags= s=>s?s.split(',').map(t=>t.trim()).filter(Boolean):[];
+
+// ──────────────────────────────────────────────
+// STREAK
+// ──────────────────────────────────────────────
+function logDay(){
+  const today=day0();
+  if(!S.activity.includes(today)){ S.activity.push(today); save(); }
+}
+function streak(){
+  const set=new Set(S.activity);
+  let n=0,d=new Date();
+  for(;;){ const ds=d.toISOString().slice(0,10); if(set.has(ds)){n++;d.setDate(d.getDate()-1);}else break; }
+  return n;
+}
+function last7(){
+  const set=new Set(S.activity), res=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const ds=day0.call(null,d); // use local date
+    const dayLabel=d.toLocaleDateString('en-US',{weekday:'short'}).slice(0,1);
+    res.push({ds,on:set.has(ds),today:i===0,dayLabel});
+  }
+  return res;
+}
+// local date for any Date object
+day0=function(d){ const x=d||new Date(); return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); };
+
+function dailyCompletions(n=7){
+  const res=[];
+  for(let i=n-1;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const ds=day0(d);
+    const count=S.tasks.filter(t=>t.completedAt===ds).length;
+    const dayLabel=d.toLocaleDateString('en-US',{weekday:'short'}).slice(0,2);
+    res.push({ds,count,dayLabel,today:i===0});
+  }
+  return res;
+}
+
+// ──────────────────────────────────────────────
+// NATURAL LANGUAGE PARSER
+// ──────────────────────────────────────────────
+function parseDue(phrase){
+  const t=phrase.toLowerCase(), now=new Date();
+  if(t.includes('today'))     return day0();
+  if(t.includes('tomorrow')){ const d=new Date(now);d.setDate(d.getDate()+1);return d.toISOString().slice(0,10); }
+  if(t.includes('next week')){ const d=new Date(now);d.setDate(d.getDate()+7);return d.toISOString().slice(0,10); }
+  for(const[i,name]of WDAYS.entries()){
+    if(t.includes(name)){ const d=new Date(now),diff=((i-d.getDay())+7)%7||7;d.setDate(d.getDate()+diff);return d.toISOString().slice(0,10); }
+  }
+  return null;
+}
+function parseCapture(raw){
+  let title=raw.trim(), projId=null, dueDate=null;
+  // #project
+  const pm=title.match(/#([a-zA-Z0-9_-]+)/);
+  if(pm){
+    const q=pm[1].toLowerCase();
+    const p=S.projects.find(p=>p.name.toLowerCase().replace(/\s+/g,'').includes(q)||p.name.toLowerCase().startsWith(q));
+    if(p) projId=p.id;
+    title=title.replace(pm[0],'').trim();
+  }
+  // due phrases (longer first to avoid partial matches)
+  const PHRASES=['due next week','due tomorrow','due today',
+    ...WDAYS.map(d=>'due '+d),'next week','tomorrow','today',...WDAYS];
+  for(const ph of PHRASES){
+    if(new RegExp('\\b'+ph+'\\b','i').test(title)){
+      dueDate=parseDue(ph);
+      title=title.replace(new RegExp('\\b'+ph+'\\b','i'),'').trim().replace(/\s+/g,' ').replace(/^[,.\-\s]+|[,.\-\s]+$/g,'').trim();
+      break;
+    }
+  }
+  return{title,projId,dueDate};
+}
+
+// ──────────────────────────────────────────────
+// SORT ORDER HELPER
+// ──────────────────────────────────────────────
+function nextSortOrder(status='not-started'){
+  const orders=S.tasks.filter(t=>t.status===status&&!t.parentId).map(t=>t.sortOrder||0);
+  return orders.length?Math.max(...orders)+1000:1000;
+}
+
+// ──────────────────────────────────────────────
+// QUICK ADD (shared by QC modal + home bar)
+// ──────────────────────────────────────────────
+function quickAdd(text,keepOpen=false){
+  const{title,projId,dueDate}=parseCapture(text);
+  if(!title) return false;
+  // Default to the current project when in project view and no #tag was typed
+  const resolvedProjId=projId||(S.view==='project'?S.projId:null);
+  const now=day0();
+  S.tasks.push({id:uid(),projectId:resolvedProjId||null,parentId:null,title,
+    status:'not-started',dueDate,tags:[],notes:'',
+    sortOrder:nextSortOrder('not-started'),
+    createdAt:now,updatedAt:now,completedAt:null});
+  save();
+  if(!keepOpen) closeQC();
+  const pname=resolvedProjId?S.projects.find(p=>p.id===resolvedProjId)?.name:null;
+  toast('✓ Added'+(pname?' to '+pname:' to Inbox'));
+  refreshAfterMutation();
+  return true;
+}
+
+// ──────────────────────────────────────────────
+// QUICK CAPTURE MODAL
+// ──────────────────────────────────────────────
+function openQC(){
+  document.getElementById('qc-wrap').classList.remove('hidden');
+  const inp=document.getElementById('qc-in');
+  inp.value='';
+  document.getElementById('qc-prev').textContent='';
+  document.getElementById('qc-chips').classList.add('hidden');
+  setTimeout(()=>inp.focus(),60);
+}
+function closeQC(){ document.getElementById('qc-wrap').classList.add('hidden'); }
+function qcKey(e){
+  if(e.key==='Escape'){closeQC();return;}
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const v=document.getElementById('qc-in').value.trim();
+    const ok=quickAdd(v,e.shiftKey);
+    if(ok&&e.shiftKey){document.getElementById('qc-in').value='';document.getElementById('qc-prev').textContent='';}
+  }
+}
+function qcHint(val){
+  const{projId,dueDate}=parseCapture(val);
+  const resolvedProjId=projId||(S.view==='project'?S.projId:null);
+  const parts=[];
+  if(resolvedProjId){const p=S.projects.find(x=>x.id===resolvedProjId);if(p)parts.push('→ '+p.name);}
+  else if(val.includes('#'))parts.push('→ Inbox');
+  else if(S.view!=='project')parts.push('→ Inbox');
+  if(dueDate) parts.push(fmtD(dueDate));
+  document.getElementById('qc-prev').textContent=parts.join(' · ');
+  // project chips
+  const hm=val.match(/#([a-zA-Z0-9_-]*)$/);
+  const chips=document.getElementById('qc-chips');
+  if(hm){
+    const q=hm[1].toLowerCase();
+    const hits=S.projects.filter(p=>p.name.toLowerCase().replace(/\s+/g,'').includes(q)).slice(0,5);
+    if(hits.length){
+      chips.innerHTML='<div class="flex gap-2 flex-wrap">'+hits.map(p=>
+        `<button onclick="fillQcProj('${p.id}','${esc(p.name)}')" class="px-2.5 py-1 rounded-full text-xs font-medium border hover:opacity-80 transition-opacity" style="border-color:${p.color};color:${p.color}">${esc(p.name)}</button>`
+      ).join('')+'</div>';
+      chips.classList.remove('hidden');
+      return;
+    }
+  }
+  chips.classList.add('hidden');
+}
+function fillQcProj(id,name){
+  const inp=document.getElementById('qc-in');
+  inp.value=inp.value.replace(/#[a-zA-Z0-9_-]*$/,'#'+name.replace(/\s+/g,''));
+  inp.focus(); qcHint(inp.value);
+}
+
+// ──────────────────────────────────────────────
+// ROUTING + VIEW MODE TOGGLE
+// ──────────────────────────────────────────────
+function sv(view,projId=null){
+  S.view=view; S.projId=projId;
+  closeSidebar(); render();
+}
+function toggleBoardView(){
+  S.boardView=!S.boardView; save(); renderTopbar(); renderMain();
+}
+
+// ──────────────────────────────────────────────
+// RENDER
+// ──────────────────────────────────────────────
+function render(){ renderSidebar(); renderTopbar(); renderMain(); }
+
+function refreshAfterMutation(){
+  renderSidebar();
+  if(['home','inbox','all','project'].includes(S.view)) renderMain();
+}
+
+// ──────────────────────────────────────────────
+// SIDEBAR
+// ──────────────────────────────────────────────
+function renderSidebar(){
+  // nav active states
+  ['home','inbox','all','notes','summary'].forEach(id=>{
+    const el=document.getElementById('n-'+id);
+    if(!el)return;
+    el.className='snav'+(S.view===id?' active':'');
+  });
+  // inbox badge
+  const inboxCt=S.tasks.filter(t=>!t.projectId&&!t.parentId).length;
+  const badge=document.getElementById('inbox-badge');
+  if(inboxCt){badge.textContent=inboxCt;badge.classList.remove('hidden');}
+  else badge.classList.add('hidden');
+  // streak widget
+  const s=streak(), l7=last7();
+  document.getElementById('sb-streak').innerHTML=`
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-white text-sm font-semibold">${s>0?'🔥 '+s+' day streak':'Start your streak'}</span>
+      ${s>0?`<span class="text-xs text-indigo-400 font-medium">${s>=7?'🏆':'keep going'}</span>`:''}
+    </div>
+    <div class="flex gap-1 mb-1">
+      ${l7.map(d=>`<div class="flex-1 flex flex-col items-center gap-0.5">
+        <div class="streak-pip w-full ${d.on?'bg-indigo-500':d.today?'bg-white/25 ring-1 ring-indigo-400/50':'bg-white/10'}" title="${d.ds}" style="height:9px;border-radius:3px"></div>
+        <span style="font-size:9px;color:${d.today?'#818cf8':'#475569'};font-weight:${d.today?'700':'400'}">${d.dayLabel}</span>
+      </div>`).join('')}
+    </div>
+    <p class="text-xs text-slate-600 mt-0.5">${s===0?'Check in daily to build a streak':s===1?'Day 1 — keep it up!':s<5?'Great momentum!':s<14?'On a roll 💪':'Unstoppable 🚀'}</p>`;
+  // projects
+  const pl=document.getElementById('proj-list');
+  if(!S.projects.length){pl.innerHTML='<p class="px-3 text-xs text-slate-600 italic py-1">No projects yet</p>';return;}
+  pl.innerHTML=S.projects.map(p=>{
+    const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId);
+    const done=top.filter(t=>t.status==='done').length;
+    const active=S.view==='project'&&S.projId===p.id;
+    return `<button onclick="sv('project','${p.id}')"
+      class="snav${active?' active':''} w-full">
+      <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:${p.color}"></span>
+      <span class="flex-1 truncate text-xs">${esc(p.name)}</span>
+      <span class="text-xs text-slate-600 flex-shrink-0 ml-auto">${done}/${top.length}</span>
+    </button>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────
+// TOPBAR
+// ──────────────────────────────────────────────
+function renderTopbar(){
+  const qabtn=`<button onclick="openQC()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 font-medium transition-colors shadow-sm">
+    <span class="text-lg leading-none -mt-px">+</span> Quick Add
+  </button>`;
+  // View toggle (list ↔ board) shown on views that support kanban
+  const viewToggle=`<div class="flex items-center rounded-xl border border-slate-200 overflow-hidden text-xs font-medium">
+    <button onclick="if(S.boardView)toggleBoardView()" title="List view"
+      class="px-2.5 py-1.5 flex items-center gap-1 transition-colors ${!S.boardView?'bg-indigo-600 text-white':'bg-white text-slate-500 hover:bg-slate-50'}">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="0" y="1" width="16" height="2.5" rx="1"/><rect x="0" y="6" width="16" height="2.5" rx="1"/><rect x="0" y="11" width="16" height="2.5" rx="1"/></svg>
+      List
+    </button>
+    <button onclick="if(!S.boardView)toggleBoardView()" title="Board view"
+      class="px-2.5 py-1.5 flex items-center gap-1 transition-colors ${S.boardView?'bg-indigo-600 text-white':'bg-white text-slate-500 hover:bg-slate-50'}">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="0" y="0" width="4.5" height="16" rx="1"/><rect x="5.75" y="0" width="4.5" height="16" rx="1"/><rect x="11.5" y="0" width="4.5" height="16" rx="1"/></svg>
+      Board
+    </button>
+  </div>`;
+  const views={
+    home   :['Home','',qabtn],
+    inbox  :['Inbox','Tasks without a project',viewToggle+qabtn],
+    all    :['All Tasks',S.tasks.filter(t=>!t.parentId&&t.status!=='done').length+' active',viewToggle+qabtn],
+    notes  :['Notes → Tasks','Paste notes, extract action items with AI',''],
+    summary:['Narrative Summary','AI-written leadership updates for any time range',''],
+  };
+  if(S.view==='project'&&S.projId){
+    const p=S.projects.find(x=>x.id===S.projId);
+    const tasks=S.tasks.filter(t=>t.projectId===S.projId&&!t.parentId);
+    const done=tasks.filter(t=>t.status==='done').length;
+    document.getElementById('tb-title').innerHTML=`<div><h2 class="text-base font-semibold text-slate-800">${esc(p?.name)}</h2><p class="text-xs text-slate-400">${done}/${tasks.length} complete</p></div>`;
+    document.getElementById('tb-actions').innerHTML=`<button onclick="openProjModal('${S.projId}')" class="text-sm text-slate-500 border border-slate-200 px-3 py-1.5 rounded-xl hover:border-slate-300 transition-colors">Edit</button>${viewToggle}${qabtn}`;
+    return;
+  }
+  const[h,sub,btn]=views[S.view]||['','',''];
+  document.getElementById('tb-title').innerHTML=`<div><h2 class="text-base font-semibold text-slate-800">${h}</h2>${sub?`<p class="text-xs text-slate-400">${sub}</p>`:''}</div>`;
+  document.getElementById('tb-actions').innerHTML=btn;
+}
+
+// ──────────────────────────────────────────────
+// MAIN ROUTER
+// ──────────────────────────────────────────────
+function renderMain(){
+  const el=document.getElementById('main');
+  switch(S.view){
+    case 'home':    el.innerHTML=buildHome();    break;
+    case 'inbox':   el.innerHTML=buildInbox();   break;
+    case 'all':     el.innerHTML=buildAll();     break;
+    case 'project': el.innerHTML=buildProject(); break;
+    case 'notes':   el.innerHTML=buildNotes();   bindNotesArea(); break;
+    case 'summary': el.innerHTML=buildSummary(); break;
+  }
+}
+
+// ──────────────────────────────────────────────
+// HOME / DASHBOARD
+// ──────────────────────────────────────────────
+function buildHome(){
+  const all  =S.tasks.filter(t=>!t.parentId);
+  const over =all.filter(t=>isOver(t.dueDate,t.status));
+  const tod  =all.filter(t=>isToday(t.dueDate,t.status));
+  const prog =all.filter(t=>t.status==='in-progress'&&!isOver(t.dueDate,t.status)&&!isToday(t.dueDate,t.status));
+  const doneT=all.filter(t=>t.status==='done'&&t.completedAt===day0());
+  const hr   =new Date().getHours();
+  const greet=hr<12?'Good morning':'Good afternoon, it\'s';
+
+  // Inline quick capture (always visible at top of Home)
+  const capture=`<div class="bg-white border border-slate-200 rounded-2xl shadow-sm mb-5 overflow-hidden">
+    <div class="flex items-center gap-3 px-4 py-3.5">
+      <span class="text-xl flex-shrink-0">⚡</span>
+      <input id="home-qc" type="text" placeholder="Add a task fast… #project · due friday · tomorrow"
+        class="flex-1 text-sm text-slate-800 bg-transparent placeholder-slate-400"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();const v=this.value.trim();if(quickAdd(v)){this.value='';document.getElementById('hqp').classList.add('hidden');}}"
+        oninput="hqHint(this.value)">
+      <kbd class="text-xs bg-slate-100 text-slate-400 px-2 py-1 rounded hidden sm:block">⌘K</kbd>
+    </div>
+    <div id="hqp" class="hidden px-4 pb-2.5 text-xs text-indigo-500 font-medium border-t border-slate-50 pt-2"></div>
+  </div>`;
+
+  const allClear=!over.length&&!tod.length;
+
+  let sections='';
+
+  if(all.length===0){
+    sections=`<div class="text-center py-14 text-slate-400">
+      <div class="text-4xl mb-3">🗂️</div>
+      <p class="text-lg font-medium text-slate-600 mb-1">Welcome, Doug!</p>
+      <p class="text-sm mb-6">Add your first task above, or create a project to get started.</p>
+      <button onclick="openProjModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-5 py-2.5 rounded-xl transition-colors">+ Create a project</button>
+    </div>`;
+  } else {
+    // 7-day velocity bar chart
+    sections+=buildVelocityChart();
+
+    if(allClear&&!prog.length&&!doneT.length){
+      sections+=`<div class="bg-green-50 border border-green-100 rounded-2xl px-4 py-3 mb-5 flex items-center gap-3">
+        <span class="text-xl">✅</span><p class="text-sm text-green-700 font-medium">All caught up — nothing overdue or due today.</p></div>`;
+    }
+    if(over.length) sections+=section('Overdue','bg-red-500','text-red-600',over,'text-red-600');
+    if(tod.length)  sections+=section('Due today','bg-blue-500','text-blue-600',tod,'text-blue-600');
+    if(prog.length) sections+=section('In progress','bg-indigo-500','text-slate-700',prog.slice(0,6),'text-slate-600',(prog.length>6?'Showing 6 of '+prog.length:''));
+    if(doneT.length)sections+=section('Done today','bg-green-500','text-green-600',doneT,'text-green-600');
+  }
+
+  return`<div class="p-5 max-w-2xl mx-auto fade-in">
+    <p class="text-sm text-slate-400 mb-4">${greet}, Doug 👋</p>
+    ${capture}${sections}
+  </div>`;
+}
+
+function section(label,dotColor,textColor,tasks,headColor,note=''){
+  return`<div class="mb-5">
+    <div class="flex items-center gap-2 mb-2.5 px-1">
+      <span class="w-2 h-2 rounded-full flex-shrink-0 ${dotColor}"></span>
+      <h3 class="text-sm font-semibold ${headColor}">${label} (${tasks.length})${note?'<span class="font-normal text-slate-400 text-xs ml-1">'+note+'</span>':''}</h3>
+    </div>
+    ${miniList(tasks)}
+  </div>`;
+}
+
+function miniList(tasks){
+  if(!tasks.length) return '';
+  return`<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    ${tasks.map((t,i)=>{
+      const cfg=STATUS[t.status]||STATUS['not-started'];
+      const isDone=t.status==='done';
+      const over=isOver(t.dueDate,t.status);
+      const proj=S.projects.find(p=>p.id===t.projectId);
+      return`<div class="flex items-center gap-2.5 px-4 py-2.5 task-row group ${i<tasks.length-1?'border-b border-slate-100':''}">
+        <button onclick="toggleDone('${t.id}')" title="${isDone?'Mark incomplete':'Mark complete'}"
+          class="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${isDone?'bg-green-500 border-green-500':'border-slate-300 hover:border-green-400'}">
+          ${isDone?`<svg class="w-2.5 h-2.5" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`:''}
+        </button>
+        <span class="flex-1 text-sm truncate ${isDone?'line-through text-slate-400':'text-slate-800'}">${esc(t.title)}</span>
+        ${proj?`<span class="text-xs hidden sm:block flex-shrink-0 font-medium" style="color:${proj.color}">● ${esc(proj.name)}</span>`:''}
+        ${t.dueDate?`<span class="text-xs flex-shrink-0 ${over?'text-red-500 font-semibold':'text-slate-400'}">${over?'⚠ ':''}${fmtD(t.dueDate)}</span>`:''}
+        <button onclick="cycStatus('${t.id}')" title="Click to change status"
+          class="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 cursor-pointer hover:opacity-75 transition-opacity ${cfg.badge}">${cfg.label}</button>
+        <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 flex-shrink-0">
+          <button onclick="openTaskMod('${t.id}')" class="p-1 hover:bg-slate-100 rounded text-slate-400 text-xs transition-colors">✏️</button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function buildVelocityChart(){
+  const data=dailyCompletions(7);
+  const max=Math.max(...data.map(d=>d.count),1); // avoid div/0
+  const totalWeek=data.reduce((s,d)=>s+d.count,0);
+  const prevData=dailyCompletions(14).slice(0,7);
+  const prevWeek=prevData.reduce((s,d)=>s+d.count,0);
+  const trend=totalWeek>prevWeek?'▲':totalWeek<prevWeek?'▼':'–';
+  const trendColor=totalWeek>prevWeek?'text-green-600':totalWeek<prevWeek?'text-red-500':'text-slate-400';
+  const BAR_H=48; // max bar height in px
+
+  const bars=data.map(d=>{
+    const h=d.count>0?Math.max(Math.round((d.count/max)*BAR_H),6):0;
+    return`<div class="flex flex-col items-center gap-1 flex-1">
+      <span class="text-xs font-semibold text-slate-600" style="min-height:1.1rem">${d.count>0?d.count:''}</span>
+      <div class="w-full flex items-end justify-center" style="height:${BAR_H}px">
+        ${d.count>0
+          ?`<div class="w-full rounded-t-md transition-all" style="height:${h}px;background:${d.today?'#6366f1':'#a5b4fc'}"></div>`
+          :`<div class="w-full rounded-t-md" style="height:3px;background:#e2e8f0"></div>`
+        }
+      </div>
+      <span class="text-xs" style="color:${d.today?'#6366f1':'#94a3b8'};font-weight:${d.today?'700':'400'}">${d.dayLabel}</span>
+    </div>`;
+  }).join('');
+
+  return`<div class="bg-white border border-slate-200 rounded-2xl shadow-sm px-4 pt-4 pb-3 mb-5">
+    <div class="flex items-center justify-between mb-3">
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tasks completed · last 7 days</p>
+      </div>
+      <div class="text-right">
+        <span class="text-lg font-bold text-slate-800">${totalWeek}</span>
+        <span class="text-xs ${trendColor} font-medium ml-1">${trend} vs prev week</span>
+      </div>
+    </div>
+    <div class="flex gap-1.5 items-end">${bars}</div>
+  </div>`;
+}
+
+function hqHint(val){
+  const{projId,dueDate}=parseCapture(val);
+  const prev=document.getElementById('hqp');
+  if(!val.trim()){prev.classList.add('hidden');return;}
+  const parts=[];
+  const p=projId?S.projects.find(x=>x.id===projId):null;
+  parts.push('→ '+(p?p.name:'Inbox'));
+  if(dueDate)parts.push(fmtD(dueDate));
+  prev.textContent=parts.join(' · ');
+  prev.classList.remove('hidden');
+}
+
+// ──────────────────────────────────────────────
+// INBOX
+// ──────────────────────────────────────────────
+function buildInbox(){
+  const tasks=S.tasks.filter(t=>!t.projectId&&!t.parentId);
+  if(!tasks.length) return`<div class="p-5 max-w-3xl mx-auto fade-in">
+    <div class="text-center py-16 text-slate-400">
+      <div class="text-4xl mb-3">📥</div>
+      <p class="text-lg font-medium text-slate-600 mb-1">Inbox is empty</p>
+      <p class="text-sm mb-5">Quick-add a task without a project and it lands here.</p>
+      <button onclick="openQC()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-5 py-2.5 rounded-xl transition-colors">⚡ Quick add</button>
+    </div></div>`;
+  if(S.boardView) return buildKanban(tasks,null);
+  return`<div class="p-5 max-w-3xl mx-auto fade-in">${taskCard(tasks,null)}</div>`;
+}
+
+// ──────────────────────────────────────────────
+// ALL TASKS
+// ──────────────────────────────────────────────
+function buildAll(){
+  const inbox=S.tasks.filter(t=>!t.projectId&&!t.parentId);
+  const groups=S.projects.map(p=>({p,tasks:S.tasks.filter(t=>t.projectId===p.id&&!t.parentId)})).filter(g=>g.tasks.length);
+  if(!inbox.length&&!groups.length) return`<div class="p-5 text-center py-16 text-slate-400 fade-in"><div class="text-4xl mb-3">📋</div><p class="font-medium">No tasks yet</p></div>`;
+  if(S.boardView){
+    const allTasks=[...inbox,...groups.flatMap(g=>g.tasks)];
+    return buildKanban(allTasks,null,true);
+  }
+  return`<div class="p-5 max-w-4xl mx-auto fade-in space-y-8">
+    ${inbox.length?`<div>
+      <div class="flex items-center gap-2 mb-3 px-1"><span class="w-3 h-3 rounded-full bg-slate-400 flex-shrink-0"></span>
+      <span class="font-semibold text-slate-700 text-sm">Inbox</span><span class="text-xs text-slate-400">${inbox.length} task${inbox.length!==1?'s':''}</span></div>
+      ${taskCard(inbox,null)}</div>`:''
+    }
+    ${groups.map(({p,tasks})=>`<div>
+      <div class="flex items-center gap-2 mb-3 px-1"><span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${p.color}"></span>
+      <span class="font-semibold text-slate-700 text-sm">${esc(p.name)}</span><span class="text-xs text-slate-400">${tasks.length} task${tasks.length!==1?'s':''}</span></div>
+      ${taskCard(tasks,p)}</div>`).join('')}
+  </div>`;
+}
+
+// ──────────────────────────────────────────────
+// PROJECT VIEW
+// ──────────────────────────────────────────────
+function buildProject(){
+  const p=S.projects.find(x=>x.id===S.projId);
+  if(!p)return'<div class="p-5 text-slate-400">Project not found.</div>';
+  const tasks=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId);
+  const done=tasks.filter(t=>t.status==='done').length;
+  const pct=tasks.length?Math.round(done/tasks.length*100):0;
+  if(!tasks.length) return`<div class="p-5 max-w-4xl mx-auto fade-in">
+    ${p.description?`<p class="text-slate-500 text-sm mb-5">${esc(p.description)}</p>`:''}
+    <div class="text-center py-16 text-slate-400"><div class="text-4xl mb-3">✨</div>
+      <p class="font-medium">No tasks yet in ${esc(p.name)}</p>
+      <p class="text-sm mt-1 mb-5">Use Quick Add or press <kbd class="bg-slate-100 px-1.5 py-0.5 rounded text-xs">⌘K</kbd></p>
+    </div></div>`;
+  const statsBar=`
+    <div class="grid grid-cols-4 gap-3 mb-4">
+      ${[['Total',tasks.length,'text-slate-700'],['Done',done,'text-green-600'],
+         ['In Progress',tasks.filter(t=>t.status==='in-progress').length,'text-blue-600'],
+         ['Blocked',tasks.filter(t=>t.status==='blocked').length,'text-red-500']
+        ].map(([l,v,c])=>`<div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+          <div class="text-2xl font-bold ${c}">${v}</div><div class="text-xs text-slate-400 mt-0.5">${l}</div></div>`).join('')}
+    </div>
+    <div class="mb-5">
+      <div class="flex justify-between text-xs text-slate-400 mb-1.5"><span>Progress</span><span>${pct}%</span></div>
+      <div class="w-full bg-slate-100 rounded-full h-2"><div class="h-2 rounded-full transition-all" style="width:${pct}%;background:${p.color}"></div></div>
+    </div>`;
+  if(S.boardView) return`<div class="fade-in">${
+    `<div class="px-5 pt-5">${p.description?`<p class="text-slate-500 text-sm mb-4">${esc(p.description)}</p>`:''}${statsBar}</div>`
+  }${buildKanban(tasks,p)}</div>`;
+  return`<div class="p-5 max-w-4xl mx-auto fade-in">
+    ${p.description?`<p class="text-slate-500 text-sm mb-4">${esc(p.description)}</p>`:''}
+    ${statsBar}
+    ${taskCard(tasks,p)}
+  </div>`;
+}
+
+// ──────────────────────────────────────────────
+// KANBAN BOARD
+// ──────────────────────────────────────────────
+function buildKanban(tasks, project, showProjectPills=false){
+  const COLS=[
+    {key:'not-started', label:'Not Started', hdr:'#64748b'},
+    {key:'in-progress',  label:'In Progress', hdr:'#2563eb'},
+    {key:'blocked',      label:'Blocked',      hdr:'#dc2626'},
+    {key:'done',         label:'Done',         hdr:'#16a34a'},
+  ];
+  const cols=COLS.map(col=>{
+    // Sort by sortOrder (assign index-based fallback for legacy tasks)
+    const colTasks=[...tasks.filter(t=>t.status===col.key)]
+      .sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
+    const cards=colTasks.map(t=>{
+      const subs=S.tasks.filter(x=>x.parentId===t.id);
+      const doneSubs=subs.filter(s=>s.status==='done').length;
+      const over=isOver(t.dueDate,t.status);
+      const isDone=t.status==='done';
+      const proj=showProjectPills?S.projects.find(p=>p.id===t.projectId):null;
+      const tags=(t.tags||[]).map(tg=>`<span style="display:inline-block;padding:.1rem .4rem;background:#f5f3ff;color:#7c3aed;font-size:.65rem;border-radius:.3rem;font-weight:500">${esc(tg)}</span>`).join(' ');
+      return`<div class="kb-card" data-id="${t.id}"
+          draggable="true"
+          ondragstart="kbDragStart(event,'${t.id}')"
+          ondragend="kbDragEnd(event)"
+          ondragover="kbCardOver(event,'${t.id}')"
+          ondrop="kbCardDrop(event,'${t.id}')"
+          onclick="openTaskMod('${t.id}')">
+        <div style="display:flex;align-items:flex-start;gap:.5rem">
+          <button onclick="event.stopPropagation();toggleDone('${t.id}')" title="${isDone?'Mark incomplete':'Mark complete'}"
+            style="width:1rem;height:1rem;border-radius:50%;border:2px solid ${isDone?'#22c55e':'#cbd5e1'};background:${isDone?'#22c55e':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.1rem;cursor:pointer;transition:border-color .15s">
+            ${isDone?`<svg width="8" height="8" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`:''}
+          </button>
+          <span style="font-size:.82rem;font-weight:500;color:${isDone?'#94a3b8':'#1e293b'};flex:1;line-height:1.35;${isDone?'text-decoration:line-through':''}">${esc(t.title)}</span>
+        </div>
+        ${tags?`<div style="margin-top:.4rem;display:flex;flex-wrap:wrap;gap:.25rem">${tags}</div>`:''}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.5rem;gap:.5rem">
+          <div style="display:flex;align-items:center;gap:.4rem">
+            ${proj?`<span style="font-size:.65rem;font-weight:600;color:${proj.color}">●&nbsp;${esc(proj.name)}</span>`:''}
+            ${subs.length?`<span style="font-size:.65rem;color:#94a3b8">⬡ ${doneSubs}/${subs.length}</span>`:''}
+          </div>
+          <div style="display:flex;align-items:center;gap:.35rem">
+            ${t.dueDate?`<span style="font-size:.65rem;font-weight:${over?'700':'400'};color:${over?'#ef4444':'#94a3b8'}">${over?'⚠ ':''}${fmtD(t.dueDate)}</span>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return`<div class="kb-col" data-col="${col.key}">
+      <div class="kb-col-hdr">
+        <span class="kb-dot" style="background:${col.hdr}"></span>
+        <span style="font-size:.78rem;font-weight:700;color:${col.hdr}">${col.label}</span>
+        <span class="kb-badge">${colTasks.length}</span>
+        <button onclick="S.boardView=false;save();renderTopbar();renderMain()" style="margin-left:auto;font-size:.7rem;color:#94a3b8;cursor:pointer;background:none;border:none" title="Switch to list">☰</button>
+      </div>
+      <div class="kb-cards"
+        ondragover="kbColOver(event,'${col.key}')"
+        ondrop="kbColDrop(event,'${col.key}')"
+        ondragleave="kbColLeave(event)">
+        ${cards||`<p class="kb-empty-hint" style="text-align:center;color:#cbd5e1;font-size:.75rem;padding:1.5rem 0;pointer-events:none">Drop cards here</p>`}
+      </div>
+      <button onclick="quickAddToCol('${col.key}')" class="kb-add-btn">+ Add task</button>
+    </div>`;
+  }).join('');
+  return`<div class="kb-board fade-in">${cols}</div>`;
+}
+
+function quickAddToCol(status){
+  window._pendingStatus=status;
+  openQC();
+}
+// Patch quickAdd to consume _pendingStatus if set
+const _origQuickAdd=quickAdd;
+window.quickAdd=function(text,keepOpen=false){
+  const result=_origQuickAdd(text,keepOpen);
+  if(result&&window._pendingStatus&&window._pendingStatus!=='not-started'){
+    const t=S.tasks[S.tasks.length-1];
+    if(t){t.status=window._pendingStatus;t.sortOrder=nextSortOrder(window._pendingStatus);save();}
+  }
+  window._pendingStatus=null;
+  return result;
+};
+
+// ──────────────────────────────────────────────
+// KANBAN DRAG-AND-DROP
+// ──────────────────────────────────────────────
+let _dragId=null, _dragOverId=null, _dragPos=null;
+
+function kbDragStart(e,id){
+  _dragId=id;
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain',id);
+  // Brief delay so ghost image captures the non-dimmed card
+  setTimeout(()=>{
+    const el=document.querySelector(`.kb-card[data-id="${id}"]`);
+    if(el) el.classList.add('kb-dragging');
+  },0);
+}
+
+function kbDragEnd(){
+  _dragId=null; _dragOverId=null; _dragPos=null;
+  document.querySelectorAll('.kb-dragging,.kb-drop-above,.kb-drop-below,.kb-col-drop')
+    .forEach(el=>el.classList.remove('kb-dragging','kb-drop-above','kb-drop-below','kb-col-drop'));
+}
+
+function kbCardOver(e,id){
+  if(!_dragId||_dragId===id) return;
+  e.preventDefault(); e.stopPropagation();
+  e.dataTransfer.dropEffect='move';
+  const rect=e.currentTarget.getBoundingClientRect();
+  const pos=e.clientY<rect.top+rect.height/2?'above':'below';
+  if(_dragOverId===id&&_dragPos===pos) return;
+  // Clear previous indicators
+  document.querySelectorAll('.kb-drop-above,.kb-drop-below')
+    .forEach(el=>el.classList.remove('kb-drop-above','kb-drop-below'));
+  document.querySelectorAll('.kb-col-drop').forEach(el=>el.classList.remove('kb-col-drop'));
+  _dragOverId=id; _dragPos=pos;
+  e.currentTarget.classList.add(pos==='above'?'kb-drop-above':'kb-drop-below');
+}
+
+function kbCardDrop(e,targetId){
+  e.preventDefault(); e.stopPropagation();
+  if(!_dragId||_dragId===targetId) return kbDragEnd();
+  const dragged=S.tasks.find(x=>x.id===_dragId);
+  const target=S.tasks.find(x=>x.id===targetId);
+  if(!dragged||!target) return kbDragEnd();
+
+  // Status change if moving columns
+  const wasStatus=dragged.status;
+  dragged.status=target.status;
+  dragged.updatedAt=day0();
+  if(dragged.status==='done'&&wasStatus!=='done'){dragged.completedAt=day0();logDay();}
+  else if(dragged.status!=='done') dragged.completedAt=null;
+
+  // Recalculate sortOrder relative to neighbour cards
+  const siblings=S.tasks
+    .filter(x=>x.status===target.status&&!x.parentId&&x.id!==_dragId)
+    .sort((a,b)=>(a.sortOrder??0)-(b.sortOrder??0));
+  const tIdx=siblings.findIndex(x=>x.id===targetId);
+  const tOrd=target.sortOrder??0;
+  if(_dragPos==='above'){
+    const prev=tIdx>0?siblings[tIdx-1].sortOrder??0:tOrd-2000;
+    dragged.sortOrder=(prev+tOrd)/2;
+  } else {
+    const next=tIdx<siblings.length-1?siblings[tIdx+1].sortOrder??0:tOrd+2000;
+    dragged.sortOrder=(tOrd+next)/2;
+  }
+  save(); kbDragEnd(); renderMain(); renderSidebar();
+}
+
+function kbColOver(e,status){
+  if(!_dragId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  // Only highlight column if not hovering a card
+  if(!e.target.closest('.kb-card')){
+    document.querySelectorAll('.kb-col-drop').forEach(el=>el.classList.remove('kb-col-drop'));
+    document.querySelectorAll('.kb-drop-above,.kb-drop-below').forEach(el=>el.classList.remove('kb-drop-above','kb-drop-below'));
+    e.currentTarget.closest('.kb-col')?.classList.add('kb-col-drop');
+    _dragOverId=null;
+  }
+}
+
+function kbColDrop(e,status){
+  e.preventDefault();
+  if(!_dragId) return;
+  // If dropped directly on a card, kbCardDrop handles it
+  if(e.target.closest('.kb-card')) return;
+  const dragged=S.tasks.find(x=>x.id===_dragId);
+  if(!dragged) return kbDragEnd();
+  const wasStatus=dragged.status;
+  dragged.status=status;
+  dragged.updatedAt=day0();
+  if(status==='done'&&wasStatus!=='done'){dragged.completedAt=day0();logDay();}
+  else if(status!=='done') dragged.completedAt=null;
+  // Place at the end of the column
+  dragged.sortOrder=nextSortOrder(status)+1;
+  save(); kbDragEnd(); renderMain(); renderSidebar();
+}
+
+function kbColLeave(e){
+  // Only clear if actually leaving the column container
+  if(!e.currentTarget.contains(e.relatedTarget)){
+    e.currentTarget.closest('.kb-col')?.classList.remove('kb-col-drop');
+  }
+}
+
+// ──────────────────────────────────────────────
+// TASK CARD + ROWS (Full detail)
+// ──────────────────────────────────────────────
+function taskCard(tasks,project){
+  const sorted=[...tasks].sort((a,b)=>{
+    const oa=isOver(a.dueDate,a.status),ob=isOver(b.dueDate,b.status);
+    if(oa&&!ob)return -1; if(!oa&&ob)return 1;
+    if(a.status==='done'&&b.status!=='done')return 1;
+    if(a.status!=='done'&&b.status==='done')return -1;
+    if(a.dueDate&&b.dueDate)return a.dueDate.localeCompare(b.dueDate);
+    return a.dueDate?-1:b.dueDate?1:0;
+  });
+  return`<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    ${sorted.map((t,i)=>taskRow(t,i<sorted.length-1)).join('')}
+  </div>`;
+}
+
+function taskRow(t,sep){
+  const subs=S.tasks.filter(x=>x.parentId===t.id);
+  const exp=S.expanded.has(t.id);
+  const cfg=STATUS[t.status]||STATUS['not-started'];
+  const isDone=t.status==='done';
+  const over=isOver(t.dueDate,t.status);
+  const tod2=isToday(t.dueDate,t.status);
+  const doneSubs=subs.filter(s=>s.status==='done').length;
+  const tags=(t.tags||[]).map(t=>`<span class="px-1.5 py-0.5 bg-violet-50 text-violet-600 text-xs rounded-md font-medium">${esc(t)}</span>`).join('');
+  const xpBtn=subs.length
+    ?`<button onclick="toggleExp('${t.id}')" class="w-5 h-5 flex items-center justify-center text-slate-300 hover:text-slate-500 flex-shrink-0 text-xs transition-colors">${exp?'▾':'▸'}</button>`
+    :`<span class="w-5 flex-shrink-0"></span>`;
+  const dateColor=over?'text-red-500 font-semibold':tod2?'text-blue-500':'text-slate-400';
+  return`<div class="${sep?'border-b border-slate-100':''}">
+    <div class="flex items-center gap-2.5 px-4 py-3 task-row group">
+      ${xpBtn}
+      <button onclick="toggleDone('${t.id}')" title="${isDone?'Mark incomplete':'Mark complete'}"
+        class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${isDone?'bg-green-500 border-green-500':'border-slate-300 hover:border-green-400'}">
+        ${isDone?`<svg class="w-3 h-3" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`:''}
+      </button>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span class="text-sm font-medium ${isDone?'line-through text-slate-400':'text-slate-800'}">${esc(t.title)}</span>${tags}
+          ${subs.length?`<span class="text-xs text-slate-400">${doneSubs}/${subs.length}</span>`:''}
+        </div>
+        ${t.notes?`<p class="text-xs text-slate-400 mt-0.5 truncate">${esc(t.notes)}</p>`:''}
+      </div>
+      ${t.dueDate?`<span class="text-xs flex-shrink-0 ${dateColor}">${over?'⚠ ':''}${fmtD(t.dueDate)}</span>`:''}
+      <button onclick="cycStatus('${t.id}')" title="Click to change status"
+        class="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 cursor-pointer hover:opacity-75 transition-opacity ${cfg.badge}">${cfg.label}</button>
+      <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 flex-shrink-0">
+        <button onclick="openTaskMod('${t.id}')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors" title="Edit">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+        <button onclick="addSub('${t.id}')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors" title="Add subtask">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        </button>
+        <button onclick="delTask('${t.id}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-400 transition-colors" title="Delete">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </div>
+    </div>
+    ${exp&&subs.length?subs.map(st=>subRow(st)).join(''):''}
+  </div>`;
+}
+
+function subRow(t){
+  const cfg=STATUS[t.status]||STATUS['not-started'];
+  const isDone=t.status==='done', over=isOver(t.dueDate,t.status);
+  const tags=(t.tags||[]).map(x=>`<span class="px-1.5 py-0.5 bg-violet-50 text-violet-600 text-xs rounded-md">${esc(x)}</span>`).join('');
+  return`<div class="flex items-center gap-2.5 px-4 py-2.5 task-row group border-t border-slate-50" style="padding-left:3.5rem;border-left:3px solid #e2e8f0">
+    <button onclick="toggleDone('${t.id}')" title="${isDone?'Mark incomplete':'Mark complete'}"
+      class="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${isDone?'bg-green-500 border-green-500':'border-slate-300 hover:border-green-400'}">
+      ${isDone?`<svg class="w-2.5 h-2.5" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`:''}
+    </button>
+    <div class="flex-1 min-w-0"><div class="flex items-center gap-1.5 flex-wrap">
+      <span class="text-sm ${isDone?'line-through text-slate-400':'text-slate-700'}">${esc(t.title)}</span>${tags}
+    </div></div>
+    ${t.dueDate?`<span class="text-xs flex-shrink-0 ${over?'text-red-500':'text-slate-400'}">${over?'⚠ ':''}${fmtD(t.dueDate)}</span>`:''}
+    <button onclick="cycStatus('${t.id}')" title="Click to change status"
+      class="text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 cursor-pointer hover:opacity-75 transition-opacity ${cfg.badge}">${cfg.label}</button>
+    <div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 flex-shrink-0">
+      <button onclick="openTaskMod('${t.id}')" class="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 text-xs">✏️</button>
+      <button onclick="delTask('${t.id}')" class="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-400 text-xs">🗑</button>
+    </div>
+  </div>`;
+}
+
+// ──────────────────────────────────────────────
+// NOTES → TASKS VIEW
+// ──────────────────────────────────────────────
+function buildNotes(){
+  const key=localStorage.getItem(KEY_API)||'';
+  return`<div class="p-5 max-w-3xl mx-auto">
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-4">
+      <div class="px-5 pt-5 pb-3">
+        <h3 class="font-semibold text-slate-800 mb-1">Paste your notes</h3>
+        <p class="text-xs text-slate-400 mb-3">Meeting notes, Google Docs, email threads, ad-hoc thoughts — anything. AI extracts action items for you to review before adding.</p>
+        <textarea id="notes-ta" rows="11"
+          placeholder="Paste notes here…&#10;&#10;Example:&#10;Synced with Sarah on the Q2 launch. Need to review the creative brief by Thursday. John is setting up the staging environment — follow up Friday. Legal needs the final contract before EOW. Schedule a retrospective with the full team next week."
+          class="w-full text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 resize-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
+          oninput="S.notepad=this.value;save()">${esc(S.notepad)}</textarea>
+      </div>
+      <div class="px-5 pb-5 flex items-end gap-3 flex-wrap">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs font-semibold text-slate-500 mb-1.5">Anthropic API Key <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-indigo-500 hover:underline font-normal">Get one →</a></label>
+          <input type="password" id="notes-key" value="${esc(key)}" placeholder="sk-ant-..."
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-indigo-400 transition-all">
+        </div>
+        <button id="ext-btn" onclick="doExtract()"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm whitespace-nowrap">
+          ✨ Extract Tasks
+        </button>
+      </div>
+    </div>
+    <div id="notes-err" class="hidden mb-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>
+    <p class="text-xs text-slate-400 text-center">Your API key is saved locally and only used to call Anthropic. Typical cost: &lt;$0.01 per extraction.</p>
+  </div>`;
+}
+function bindNotesArea(){/* textarea oninput handles it */}
+
+async function doExtract(){
+  const text=document.getElementById('notes-ta').value.trim();
+  const key=document.getElementById('notes-key').value.trim();
+  const err=document.getElementById('notes-err');
+  err.classList.add('hidden');
+  if(!text) return(err.textContent='Paste some notes first.',err.classList.remove('hidden'));
+  if(!key)  return(err.textContent='Enter your Anthropic API key.',err.classList.remove('hidden'));
+  localStorage.setItem(KEY_API,key);
+  const btn=document.getElementById('ext-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spin">⟳</span> Extracting…';
+  const prompt=`Extract every concrete action item from these notes. Return ONLY valid JSON with no other text:
+{"tasks":[{"title":"Verb-object task title","notes":"Brief context or empty string","suggestedProject":"project name if clearly inferrable else null"}]}
+
+Notes:
+---
+${text}
+---`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,messages:[{role:'user',content:prompt}]}),
+    });
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`);}
+    const j=await res.json();
+    const raw=(j.content?.[0]?.text||'{"tasks":[]}').replace(/^```json\s*/,'').replace(/```\s*$/,'');
+    const parsed=JSON.parse(raw);
+    showExtract(parsed.tasks||[]);
+  }catch(e){err.textContent='Error: '+e.message;err.classList.remove('hidden');}
+  finally{btn.disabled=false;btn.innerHTML='✨ Extract Tasks';}
+}
+
+function showExtract(tasks){
+  if(!tasks.length){toast('No action items found.');return;}
+  const rows=tasks.map((t,i)=>{
+    const projOpts=`<option value="">📥 Inbox</option>`+
+      S.projects.map(p=>`<option value="${p.id}" ${t.suggestedProject&&p.name.toLowerCase().includes((t.suggestedProject||'').toLowerCase())?'selected':''}>${esc(p.name)}</option>`).join('');
+    return`<div class="flex items-start gap-3 py-3 ${i<tasks.length-1?'border-b border-slate-100':''}">
+      <input type="checkbox" class="ext-chk mt-0.5 w-4 h-4 accent-indigo-600 flex-shrink-0 cursor-pointer" data-i="${i}" checked>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-slate-800">${esc(t.title)}</p>
+        ${t.notes?`<p class="text-xs text-slate-400 mt-0.5">${esc(t.notes)}</p>`:''}
+      </div>
+      <select class="ext-proj text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:border-indigo-400 flex-shrink-0" data-i="${i}">${projOpts}</select>
+    </div>`;
+  }).join('');
+  document.getElementById('ext-box').innerHTML=`<div class="p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold text-slate-800">${tasks.length} action item${tasks.length!==1?'s':''} found</h3>
+      <button onclick="closeExt()" class="text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
+    </div>
+    <p class="text-xs text-slate-400 mb-4">Check the ones to add. Assign a project or leave in Inbox.</p>
+    <div class="mb-5">${rows}</div>
+    <div class="flex gap-3">
+      <button onclick="addExtracted(${JSON.stringify(tasks).replace(/"/g,'&quot;')})"
+        class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">Add selected</button>
+      <button onclick="closeExt()" class="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+    </div>
+  </div>`;
+  document.getElementById('ext-wrap').classList.remove('hidden');
+}
+
+function addExtracted(tasks){
+  const chks=document.querySelectorAll('.ext-chk');
+  const projs=document.querySelectorAll('.ext-proj');
+  let added=0; const now=day0();
+  chks.forEach((cb,i)=>{
+    if(!cb.checked)return;
+    S.tasks.push({id:uid(),projectId:projs[i]?.value||null,parentId:null,
+      title:tasks[i].title,status:'not-started',dueDate:null,tags:[],
+      notes:tasks[i].notes||'',sortOrder:nextSortOrder('not-started'),
+      createdAt:now,updatedAt:now,completedAt:null});
+    added++;
+  });
+  save(); closeExt(); render(); toast(`✓ Added ${added} task${added!==1?'s':''}`);
+}
+function closeExt(){document.getElementById('ext-wrap').classList.add('hidden');}
+
+// ──────────────────────────────────────────────
+// SUMMARY VIEW
+// ──────────────────────────────────────────────
+function buildSummary(){
+  const key=localStorage.getItem(KEY_API)||'';
+  const end=day0();
+  const start=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+  const projOpts=`<option value="">All projects</option>`+
+    S.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  return`<div class="p-5 max-w-3xl mx-auto">
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 mb-4">
+      <h3 class="font-semibold text-slate-800 mb-5 flex items-center gap-2"><span class="text-xl">✨</span>Generate Status Update</h3>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">From</label>
+          <input type="date" id="s-start" value="${start}" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></div>
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">To</label>
+          <input type="date" id="s-end" value="${end}" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Project scope</label>
+          <select id="s-proj" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-indigo-400">${projOpts}</select></div>
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Audience</label>
+          <input type="text" id="s-ctx" placeholder="e.g. Executive leadership team"
+            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></div>
+      </div>
+      <div class="mb-5">
+        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Anthropic API Key <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-indigo-500 hover:underline font-normal ml-1">Get one →</a></label>
+        <input type="password" id="s-key" value="${esc(key)}" placeholder="sk-ant-..."
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+        <p class="text-xs text-slate-400 mt-1.5">Saved locally. Typical cost: &lt;$0.01 per generation (Claude Haiku).</p>
+      </div>
+      <button id="s-btn" onclick="genSummary()"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-sm">
+        ✨ Generate Narrative Summary
+      </button>
+    </div>
+    <div id="s-err" class="hidden mb-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>
+    <div id="s-out" class="hidden bg-white border border-slate-200 rounded-2xl shadow-sm p-5 fade-in">
+      <div class="flex items-start justify-between mb-4">
+        <div><h3 class="font-semibold text-slate-800">Generated Summary</h3>
+          <p id="s-meta" class="text-xs text-slate-400 mt-0.5"></p></div>
+        <button onclick="copySummary()" id="s-copy"
+          class="text-xs border border-slate-200 hover:border-indigo-300 text-slate-600 hover:text-indigo-600 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">Copy</button>
+      </div>
+      <div id="s-body" class="prose text-sm"></div>
+    </div>
+  </div>`;
+}
+
+async function genSummary(){
+  const key=document.getElementById('s-key').value.trim();
+  const start=document.getElementById('s-start').value;
+  const end=document.getElementById('s-end').value;
+  const projId=document.getElementById('s-proj').value;
+  const ctx=document.getElementById('s-ctx').value.trim();
+  const err=document.getElementById('s-err');
+  err.classList.add('hidden');
+  document.getElementById('s-out').classList.add('hidden');
+  if(!key)   return(err.textContent='Enter your API key.',err.classList.remove('hidden'));
+  if(!start||!end)return(err.textContent='Select a date range.',err.classList.remove('hidden'));
+  if(start>end)return(err.textContent='Start must be before end.',err.classList.remove('hidden'));
+  localStorage.setItem(KEY_API,key);
+  const btn=document.getElementById('s-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spin">⟳</span> Generating…';
+  const filterP=t=>!projId||t.projectId===projId;
+  const all=S.tasks.filter(t=>!t.parentId&&filterP(t));
+  const pn=t=>S.projects.find(p=>p.id===t.projectId)?.name||'Inbox';
+  const fmt=t=>`[${pn(t)}] ${t.title}${t.notes?' — '+t.notes:''}${t.dueDate?' (due '+fmtD(t.dueDate)+')':''}`;
+  const data={
+    completed:all.filter(t=>t.status==='done'&&t.completedAt&&t.completedAt>=start&&t.completedAt<=end).map(fmt),
+    inProgress:all.filter(t=>t.status==='in-progress').map(fmt),
+    blocked:all.filter(t=>t.status==='blocked').map(fmt),
+    upcoming:all.filter(t=>t.status!=='done'&&t.dueDate&&t.dueDate>end).slice(0,8).map(fmt),
+  };
+  const scope=projId?(S.projects.find(p=>p.id===projId)?.name||''):'All projects';
+  const li=arr=>arr.length?arr.map(x=>'  - '+x).join('\n'):'  (none)';
+  const prompt=`You are a skilled product manager writing a formal leadership status update.
+
+Period: ${fmtDLong(start)} to ${fmtDLong(end)}
+Scope: ${scope}
+${ctx?'Audience: '+ctx:''}
+
+DATA:
+Completed this period:
+${li(data.completed)}
+
+In progress:
+${li(data.inProgress)}
+
+Blocked:
+${li(data.blocked)}
+
+Coming up next:
+${li(data.upcoming)}
+
+Write a polished leadership-ready update with markdown section headers (## for each section):
+
+## Summary
+2–3 sentence executive overview. Lead with progress and momentum.
+
+## Accomplishments
+Work completed this period, framed around outcomes and impact.
+
+## In Progress
+What's actively being worked on and current status.
+
+## Up Next
+Priorities ahead.
+${data.blocked.length?'## Blockers\nItems needing decisions or unblocking.\n':''}
+
+Rules:
+- First person, direct, professional — not robotic
+- Lead with outcomes, not just task names
+- 250–400 words total
+- Omit sections gracefully if empty
+- No title or date header (displayed above the output)`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1800,messages:[{role:'user',content:prompt}]}),
+    });
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`);}
+    const j=await res.json();
+    const text=j.content?.[0]?.text||'';
+    document.getElementById('s-meta').textContent=`${fmtDLong(start)} – ${fmtDLong(end)} · ${scope}`;
+    document.getElementById('s-body').innerHTML=md2html(text);
+    document.getElementById('s-out').classList.remove('hidden');
+    document.getElementById('s-out').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){err.textContent='Error: '+e.message;err.classList.remove('hidden');}
+  finally{btn.disabled=false;btn.innerHTML='✨ Generate Narrative Summary';}
+}
+
+function md2html(t){
+  return t
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^[-•*]\s+(.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>\n?)+/g,m=>`<ul>${m}</ul>`)
+    .split('\n').map(l=>l&&!l.startsWith('<')?`<p>${l}</p>`:l).join('');
+}
+
+function copySummary(){
+  navigator.clipboard.writeText(document.getElementById('s-body').innerText).then(()=>{
+    const b=document.getElementById('s-copy');
+    const orig=b.textContent; b.textContent='✓ Copied!';
+    b.className=b.className.replace('text-slate-600','text-green-600').replace('border-slate-200','border-green-300');
+    setTimeout(()=>{b.textContent=orig;b.className=b.className.replace('text-green-600','text-slate-600').replace('border-green-300','border-slate-200');},2500);
+  });
+}
+
+// ──────────────────────────────────────────────
+// TASK ACTIONS
+// ──────────────────────────────────────────────
+function toggleExp(id){ S.expanded.has(id)?S.expanded.delete(id):S.expanded.add(id); render(); }
+
+// Circle button: simple done ↔ not-done toggle
+function toggleDone(id){
+  const t=S.tasks.find(x=>x.id===id); if(!t)return;
+  if(t.status==='done'){
+    t.status='in-progress'; t.completedAt=null;
+  }else{
+    t.status='done'; t.completedAt=day0(); logDay();
+  }
+  t.updatedAt=day0(); save(); render();
+}
+
+// Status badge: cycles through all statuses (not-started → in-progress → blocked → done)
+function cycStatus(id){
+  const t=S.tasks.find(x=>x.id===id); if(!t)return;
+  const i=ST_ORDER.indexOf(t.status);
+  t.status=ST_ORDER[(i+1)%ST_ORDER.length];
+  t.updatedAt=day0();
+  t.completedAt=t.status==='done'?day0():null;
+  if(t.status==='done') logDay();
+  save(); render();
+}
+
+function delTask(id){
+  const t=S.tasks.find(x=>x.id===id);
+  const subs=S.tasks.filter(x=>x.parentId===id).length;
+  if(!confirm(`Delete "${t?.title}"${subs?` and ${subs} subtask(s)`:''}?`))return;
+  S.tasks=S.tasks.filter(x=>x.id!==id&&x.parentId!==id);
+  save(); render();
+}
+
+function addSub(parentId){
+  S.expanded.add(parentId);
+  const parent=S.tasks.find(t=>t.id===parentId);
+  openTaskMod(null,parentId,parent?.projectId);
+}
+
+// ──────────────────────────────────────────────
+// PROJECT MODAL
+// ──────────────────────────────────────────────
+function openProjModal(pid=null){
+  const p=pid?S.projects.find(x=>x.id===pid):null;
+  window._col=p?.color||COLORS[0];
+  showMod(`<div class="p-5">
+    <h3 class="text-lg font-semibold text-slate-800 mb-5">${p?'Edit Project':'New Project'}</h3>
+    <div class="space-y-4">
+      <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Project name *</label>
+        <input id="pm-name" type="text" value="${esc(p?.name||'')}" placeholder="e.g. Q2 Launch, Platform Redesign…"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></div>
+      <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Description <span class="font-normal text-slate-400">(optional)</span></label>
+        <textarea id="pm-desc" rows="2" placeholder="What is this project about?"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 resize-none">${esc(p?.description||'')}</textarea></div>
+      <div><label class="block text-xs font-semibold text-slate-500 mb-2">Color</label>
+        <div class="flex gap-2 flex-wrap" id="cpick">
+          ${COLORS.map(c=>`<button onclick="pickCol('${c}')" data-c="${c}"
+            class="w-8 h-8 rounded-full transition-all ${c===window._col?'ring-2 ring-offset-2 ring-slate-600 scale-110':'hover:scale-105'}"
+            style="background:${c}"></button>`).join('')}
+        </div></div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="saveProjModal('${pid||''}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">${p?'Save':'Create Project'}</button>
+      ${p?`<button onclick="delProj('${pid}')" class="px-4 py-2.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-xl text-sm transition-colors">Delete</button>`:''}
+      <button onclick="closeMod()" class="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+    </div>
+  </div>`);
+  setTimeout(()=>document.getElementById('pm-name')?.focus(),60);
+}
+function pickCol(c){
+  window._col=c;
+  document.querySelectorAll('#cpick button').forEach(b=>{
+    b.className=`w-8 h-8 rounded-full transition-all ${b.dataset.c===c?'ring-2 ring-offset-2 ring-slate-600 scale-110':'hover:scale-105'}`;
+    b.style.background=b.dataset.c;
+  });
+}
+function saveProjModal(pid){
+  const name=document.getElementById('pm-name').value.trim();
+  if(!name){alert('Name is required.');return;}
+  const desc=document.getElementById('pm-desc').value.trim();
+  const color=window._col||COLORS[0];
+  if(pid){const p=S.projects.find(x=>x.id===pid);if(p)Object.assign(p,{name,description:desc,color});}
+  else S.projects.push({id:uid(),name,description:desc,color,createdAt:day0()});
+  save();closeMod();render();
+}
+function delProj(pid){
+  const p=S.projects.find(x=>x.id===pid);
+  const ct=S.tasks.filter(t=>t.projectId===pid).length;
+  if(!confirm(`Delete "${p?.name}" and ${ct} associated task(s)?`))return;
+  S.projects=S.projects.filter(x=>x.id!==pid);
+  S.tasks=S.tasks.filter(t=>t.projectId!==pid);
+  if(S.projId===pid){S.view='home';S.projId=null;}
+  save();closeMod();render();
+}
+
+// ──────────────────────────────────────────────
+// TASK MODAL
+// ──────────────────────────────────────────────
+function openTaskMod(tid=null,parentId=null,forcedProj=null){
+  const t=tid?S.tasks.find(x=>x.id===tid):null;
+  const isSub=!!(parentId||t?.parentId);
+  const defProj=t?.projectId||forcedProj||S.projId||'';
+  const popts=`<option value="" ${!defProj?'selected':''}>📥 Inbox (no project)</option>`+
+    S.projects.map(p=>`<option value="${p.id}" ${defProj===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
+  showMod(`<div class="p-5">
+    <h3 class="text-lg font-semibold text-slate-800 mb-5">${isSub?'Add Subtask':t?'Edit Task':'New Task'}</h3>
+    <div class="space-y-4">
+      <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Title *</label>
+        <input id="tm-title" type="text" value="${esc(t?.title||'')}" placeholder="What needs to be done?"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Project</label>
+          <select id="tm-proj" ${isSub?'disabled':''} class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-indigo-400 ${isSub?'opacity-50 cursor-not-allowed':''}">${popts}</select></div>
+        <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Status</label>
+          <select id="tm-status" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:border-indigo-400">
+            ${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${(t?.status||'not-started')===k?'selected':''}>${v.label}</option>`).join('')}
+          </select></div>
+      </div>
+      <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Due date <span class="font-normal text-slate-400">(optional)</span></label>
+        <input id="tm-due" type="date" value="${t?.dueDate||''}" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></div>
+      <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Tags <span class="font-normal text-slate-400">(comma-separated)</span></label>
+        <input id="tm-tags" type="text" value="${esc((t?.tags||[]).join(', '))}" placeholder="frontend, launch, Q2"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"></div>
+      <div><label class="block text-xs font-semibold text-slate-500 mb-1.5">Notes <span class="font-normal text-slate-400">(optional)</span></label>
+        <textarea id="tm-notes" rows="3" placeholder="Context, links, details…"
+          class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:border-indigo-400 resize-none">${esc(t?.notes||'')}</textarea></div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="saveTaskMod('${tid||''}','${parentId||t?.parentId||''}')"
+        class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+        ${t?'Save Changes':isSub?'Add Subtask':'Create Task'}</button>
+      <button onclick="closeMod()" class="px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl text-sm transition-colors">Cancel</button>
+    </div>
+  </div>`);
+  setTimeout(()=>document.getElementById('tm-title')?.focus(),60);
+}
+
+function saveTaskMod(tid,parentId){
+  const title=document.getElementById('tm-title').value.trim();
+  if(!title){alert('Title required.');return;}
+  const pe=document.getElementById('tm-proj');
+  const projId=pe.disabled?(parentId?S.tasks.find(t=>t.id===parentId)?.projectId:null):(pe.value||null);
+  const status=document.getElementById('tm-status').value;
+  const dueDate=document.getElementById('tm-due').value||null;
+  const tags=parseTags(document.getElementById('tm-tags').value);
+  const notes=document.getElementById('tm-notes').value.trim();
+  const now=day0();
+  if(tid){
+    const t=S.tasks.find(x=>x.id===tid); if(!t)return;
+    const was=t.status==='done';
+    Object.assign(t,{title,status,dueDate,tags,notes,updatedAt:now});
+    if(!t.parentId)t.projectId=projId;
+    if(status==='done'&&!was)t.completedAt=now;
+    else if(status!=='done')t.completedAt=null;
+  }else{
+    const rp=parentId?S.tasks.find(t=>t.id===parentId)?.projectId:projId;
+    S.tasks.push({id:uid(),projectId:rp||null,parentId:parentId||null,
+      title,status,dueDate,tags,notes,sortOrder:nextSortOrder(status),createdAt:now,updatedAt:now,
+      completedAt:status==='done'?now:null});
+  }
+  save();closeMod();render();
+}
+
+// ──────────────────────────────────────────────
+// MODAL HELPERS
+// ──────────────────────────────────────────────
+function showMod(html){document.getElementById('mod-box').innerHTML=html;document.getElementById('mod-wrap').classList.remove('hidden');}
+function closeMod(){document.getElementById('mod-wrap').classList.add('hidden');}
+
+// ──────────────────────────────────────────────
+// TOAST
+// ──────────────────────────────────────────────
+let _tt;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.style.opacity='1';el.style.transform='translateY(0) translateX(-50%)';
+  clearTimeout(_tt);_tt=setTimeout(()=>{el.style.opacity='0';el.style.transform='translateY(8px) translateX(-50%)';},2400);
+}
+
+// ──────────────────────────────────────────────
+// MOBILE SIDEBAR
+// ──────────────────────────────────────────────
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('mob-overlay').classList.remove('hidden');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('mob-overlay').classList.add('hidden');}
+
+// ──────────────────────────────────────────────
+// KEYBOARD SHORTCUTS
+// ──────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeMod();closeQC();closeExt();return;}
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();openQC();}
+});
+
+// ──────────────────────────────────────────────
+// BOOT
+// ──────────────────────────────────────────────
+// Show login screen and initialize Firebase.
+// onAuthStateChanged handles the rest.
+initFirebase();
+</script>
+</body>
+</html>
