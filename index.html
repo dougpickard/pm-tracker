@@ -114,6 +114,17 @@ select.field{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 }
 #mob-overlay{display:none}
 
+/* ── Notes view tabs ────────────────────────── */
+.notes-tab-bar{display:flex;gap:.25rem;background:#f1f5f9;padding:.25rem;border-radius:.75rem;width:fit-content;margin-bottom:1.25rem}
+.notes-tab{padding:.4rem .9rem;border-radius:.5rem;font-size:.8rem;font-weight:500;color:#64748b;cursor:pointer;transition:all .15s;background:none;border:none}
+.notes-tab.active{background:#fff;color:#4f46e5;box-shadow:0 1px 3px rgba(0,0,0,.1);font-weight:600}
+.scan-drop{border:2px dashed #e2e8f0;border-radius:1rem;min-height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;position:relative;overflow:hidden;transition:border-color .2s,background .2s;cursor:default}
+.scan-drop.drag-over{border-color:#6366f1;background:#eef2ff}
+.scan-drop.has-img{border-style:solid;border-color:#c7d2fe;background:#f8f8ff;padding:.75rem}
+.scan-drop img{max-width:100%;max-height:260px;border-radius:.5rem;object-fit:contain;display:block}
+.scan-clear{position:absolute;top:.6rem;right:.6rem;background:rgba(0,0,0,.45);color:#fff;border:none;border-radius:50%;width:1.6rem;height:1.6rem;font-size:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.scan-clear:hover{background:rgba(0,0,0,.7)}
+
 /* ── Kanban board ────────────────────────────── */
 .kb-board{display:flex;gap:1rem;padding:1.25rem;overflow-x:auto;align-items:flex-start;min-height:calc(100vh - 120px)}
 .kb-col{flex:0 0 272px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:1rem;display:flex;flex-direction:column;max-height:calc(100vh - 140px)}
@@ -499,12 +510,12 @@ select.field{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 // FIREBASE CONFIG  ← paste your config values here
 // ══════════════════════════════════════════════════
 const FIREBASE_CONFIG = {
-  apiKey:            'YOUR_API_KEY',
-  authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
-  projectId:         'YOUR_PROJECT_ID',
-  storageBucket:     'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-  appId:             'YOUR_APP_ID',
+  apiKey:            'AIzaSyDIkMKU3aBPw75roL6vxZSbHFwUMuRHjaE',
+  authDomain:        'pm-tracker-34a24.firebaseapp.com',
+  projectId:         'pm-tracker-34a24',
+  storageBucket:     'pm-tracker-34a24.firebasestorage.app',
+  messagingSenderId: '121542007391',
+  appId:             '1:121542007391:web:cfcffd19869326a8df59ea',
 };
 // Only this Google account is allowed in
 const ALLOWED_EMAIL = 'douglas.pickard@disney.com';
@@ -536,6 +547,9 @@ let S = {
   notepad:'',    // persisted paste pad
   boardView:false, // kanban vs list toggle
 };
+
+// Notes view tab state (not persisted — resets on navigation)
+let _notesTab='text', _scanImg=null;
 
 // ──────────────────────────────────────────────
 // PERSISTENCE
@@ -1492,33 +1506,149 @@ function subRow(t){
 // ──────────────────────────────────────────────
 function buildNotes(){
   const key=localStorage.getItem(KEY_API)||'';
-  return`<div class="p-5 max-w-3xl mx-auto">
+  const apiKeyField=`<div class="flex-1 min-w-[200px]">
+    <label class="block text-xs font-semibold text-slate-500 mb-1.5">Anthropic API Key <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-indigo-500 hover:underline font-normal">Get one →</a></label>
+    <input type="password" id="notes-key" value="${esc(key)}" placeholder="sk-ant-..."
+      class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-indigo-400 transition-all">
+  </div>`;
+
+  const textPanel=`
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-4">
       <div class="px-5 pt-5 pb-3">
         <h3 class="font-semibold text-slate-800 mb-1">Paste your notes</h3>
         <p class="text-xs text-slate-400 mb-3">Meeting notes, Google Docs, email threads, ad-hoc thoughts — anything. AI extracts action items for you to review before adding.</p>
-        <textarea id="notes-ta" rows="11"
-          placeholder="Paste notes here…&#10;&#10;Example:&#10;Synced with Sarah on the Q2 launch. Need to review the creative brief by Thursday. John is setting up the staging environment — follow up Friday. Legal needs the final contract before EOW. Schedule a retrospective with the full team next week."
+        <textarea id="notes-ta" rows="10"
+          placeholder="Paste notes here…&#10;&#10;Example:&#10;Synced with Sarah on the Q2 launch. Need to review the creative brief by Thursday. John is setting up the staging environment — follow up Friday. Legal needs the final contract before EOW."
           class="w-full text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 resize-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
           oninput="S.notepad=this.value;save()">${esc(S.notepad)}</textarea>
       </div>
       <div class="px-5 pb-5 flex items-end gap-3 flex-wrap">
-        <div class="flex-1 min-w-[200px]">
-          <label class="block text-xs font-semibold text-slate-500 mb-1.5">Anthropic API Key <a href="https://console.anthropic.com/settings/keys" target="_blank" class="text-indigo-500 hover:underline font-normal">Get one →</a></label>
-          <input type="password" id="notes-key" value="${esc(key)}" placeholder="sk-ant-..."
-            class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-indigo-400 transition-all">
-        </div>
+        ${apiKeyField}
         <button id="ext-btn" onclick="doExtract()"
           class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm whitespace-nowrap">
           ✨ Extract Tasks
         </button>
       </div>
     </div>
-    <div id="notes-err" class="hidden mb-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>
+    <div id="notes-err" class="hidden mb-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>`;
+
+  const scanPanel=`
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-4">
+      <div class="px-5 pt-5 pb-3">
+        <h3 class="font-semibold text-slate-800 mb-1">Scan a note or message</h3>
+        <p class="text-xs text-slate-400 mb-3">Paste (⌘V) or drag in a screenshot of a Teams message, email, whiteboard photo, or handwritten note — AI will pull out the action items.</p>
+        <div id="scan-drop" class="scan-drop ${_scanImg?'has-img':''}"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="scanDrop(event)">
+          ${_scanImg
+            ?`<img src="${_scanImg.dataUrl}" alt="Scanned note">
+               <button class="scan-clear" onclick="clearScanImg()" title="Remove">✕</button>`
+            :`<div style="text-align:center;color:#94a3b8;pointer-events:none;padding:1rem">
+                <div style="font-size:2.5rem;margin-bottom:.6rem">📷</div>
+                <p style="font-size:.875rem;font-weight:500;color:#64748b;margin-bottom:.25rem">Paste (⌘V) or drag an image here</p>
+                <p style="font-size:.75rem">Works with screenshots, phone photos, and handwritten notes</p>
+              </div>`
+          }
+        </div>
+      </div>
+      <div class="px-5 pb-5 flex items-end gap-3 flex-wrap">
+        ${apiKeyField}
+        <button id="scan-btn" onclick="doScanExtract()" ${!_scanImg?'disabled style="opacity:.5;cursor:not-allowed"':''}
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-2 shadow-sm whitespace-nowrap">
+          ✨ Extract Tasks
+        </button>
+      </div>
+    </div>
+    <div id="scan-err" class="hidden mb-4 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>`;
+
+  return`<div class="p-5 max-w-3xl mx-auto">
+    <div class="notes-tab-bar">
+      <button class="notes-tab ${_notesTab==='text'?'active':''}" onclick="setNotesTab('text')">📝 Paste text</button>
+      <button class="notes-tab ${_notesTab==='image'?'active':''}" onclick="setNotesTab('image')">📷 Scan image</button>
+    </div>
+    ${_notesTab==='text'?textPanel:scanPanel}
     <p class="text-xs text-slate-400 text-center">Your API key is saved locally and only used to call Anthropic. Typical cost: &lt;$0.01 per extraction.</p>
   </div>`;
 }
-function bindNotesArea(){/* textarea oninput handles it */}
+
+function bindNotesArea(){
+  // Register a document-level paste handler once; it only fires when on the image tab
+  if(!window._imgPasteReady){
+    document.addEventListener('paste',e=>{
+      if(S.view!=='notes'||_notesTab!=='image') return;
+      const items=e.clipboardData?.items||[];
+      for(const item of items){
+        if(item.type.startsWith('image/')){
+          e.preventDefault();
+          handleImgFile(item.getAsFile());
+          return;
+        }
+      }
+    });
+    window._imgPasteReady=true;
+  }
+}
+
+function setNotesTab(tab){
+  _notesTab=tab;
+  _scanImg=null;
+  renderMain();
+}
+
+function scanDrop(e){
+  e.preventDefault();
+  document.getElementById('scan-drop')?.classList.remove('drag-over');
+  const file=[...e.dataTransfer.files].find(f=>f.type.startsWith('image/'));
+  if(file) handleImgFile(file);
+}
+
+function handleImgFile(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=evt=>{
+    _scanImg={dataUrl:evt.target.result,type:file.type};
+    renderMain();
+    setTimeout(()=>document.getElementById('scan-btn')?.removeAttribute('disabled'),60);
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearScanImg(){
+  _scanImg=null;
+  renderMain();
+}
+
+async function doScanExtract(){
+  if(!_scanImg) return;
+  const key=document.getElementById('notes-key').value.trim();
+  const err=document.getElementById('scan-err');
+  err.classList.add('hidden');
+  if(!key) return(err.textContent='Enter your Anthropic API key.',err.classList.remove('hidden'));
+  localStorage.setItem(KEY_API,key);
+  const btn=document.getElementById('scan-btn');
+  btn.disabled=true; btn.innerHTML='<span class="spin">⟳</span> Scanning…';
+  const base64=_scanImg.dataUrl.split(',')[1];
+  const prompt=`Extract every concrete action item visible in this image. Return ONLY valid JSON with no other text:
+{"tasks":[{"title":"Verb-object task title","notes":"Brief context or empty string","suggestedProject":"project name if clearly inferrable else null"}]}
+If no action items found, return {"tasks":[]}`;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:1200,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:_scanImg.type,data:base64}},
+          {type:'text',text:prompt}
+        ]}]}),
+    });
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`API ${res.status}`);}
+    const j=await res.json();
+    const raw=(j.content?.[0]?.text||'{"tasks":[]}').replace(/^```json\s*/,'').replace(/```\s*$/,'');
+    showExtract(JSON.parse(raw).tasks||[]);
+  }catch(e){err.textContent='Error: '+e.message;err.classList.remove('hidden');}
+  finally{if(btn){btn.disabled=false;btn.innerHTML='✨ Extract Tasks';}}
+}
 
 async function doExtract(){
   const text=document.getElementById('notes-ta').value.trim();
